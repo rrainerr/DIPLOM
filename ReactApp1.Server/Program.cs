@@ -1,18 +1,26 @@
+using Microsoft.EntityFrameworkCore;
+using ReactApp1.Server.Models; // Убедитесь, что это правильное пространство имен для PostgresContext
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
+// Добавляем сервисы в контейнер.
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+
+// Регистрируем контекст базы данных
+builder.Services.AddDbContext<PostgresContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Настройка Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
+// Используем статические файлы и маршрутизацию по умолчанию
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-// Configure the HTTP request pipeline.
+// Настройка конвейера HTTP-запросов.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

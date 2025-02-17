@@ -1,32 +1,38 @@
-import { useEffect, useState } from 'react';
+п»їimport { useEffect, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import { Form, Input, Button, Card, message } from 'antd';
+import Profile from './Profile';
 import './App.css';
 
-function App() {
+function AuthForm() {
     const [loading, setLoading] = useState(false);
+    const navigate = useNavigate();
 
     const onFinish = async (values) => {
         setLoading(true);
         try {
-            // Здесь можно отправить данные на сервер для авторизации
             const response = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(values),
+                body: JSON.stringify({
+                    Email: values.email,
+                    Password: values.password,
+                }),
             });
 
             if (response.ok) {
                 const data = await response.json();
-                message.success('Авторизация успешна!');
-                console.log('Успешная авторизация:', data);
+                message.success('РђРІС‚РѕСЂРёР·Р°С†РёСЏ СѓСЃРїРµС€РЅР°!');
+                localStorage.setItem('user', JSON.stringify(data.user)); // РЎРѕС…СЂР°РЅСЏРµРј РґР°РЅРЅС‹Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+                navigate('/profile'); // РџРµСЂРµРЅР°РїСЂР°РІР»СЏРµРј РЅР° СЃС‚СЂР°РЅРёС†Сѓ РїСЂРѕС„РёР»СЏ
             } else {
-                message.error('Ошибка авторизации. Проверьте данные.');
+                message.error('РћС€РёР±РєР° Р°РІС‚РѕСЂРёР·Р°С†РёРё. РџСЂРѕРІРµСЂСЊС‚Рµ РґР°РЅРЅС‹Рµ.');
             }
         } catch (error) {
-            message.error('Произошла ошибка при авторизации.');
-            console.error('Ошибка:', error);
+            message.error('РџСЂРѕРёР·РѕС€Р»Р° РѕС€РёР±РєР° РїСЂРё Р°РІС‚РѕСЂРёР·Р°С†РёРё.');
+            console.error('РћС€РёР±РєР°:', error);
         } finally {
             setLoading(false);
         }
@@ -34,7 +40,7 @@ function App() {
 
     return (
         <div className="app-container">
-            <Card title="Авторизация" className="auth-card">
+            <Card title="РђРІС‚РѕСЂРёР·Р°С†РёСЏ" className="auth-card">
                 <Form
                     name="authForm"
                     initialValues={{ remember: true }}
@@ -42,29 +48,41 @@ function App() {
                     autoComplete="off"
                 >
                     <Form.Item
-                        label="Почта"
-                        name="username"
-                        rules={[{ required: true, message: 'Введите почту!' }]}
+                        placeholder="Р’РІРµРґРёС‚Рµ РїРѕС‡С‚Сѓ"
+                        label="РџРѕС‡С‚Р°"
+                        name="email"
+                        rules={[{ required: true, message: 'Р’РІРµРґРёС‚Рµ РїРѕС‡С‚Сѓ!' }]}
                     >
                         <Input />
                     </Form.Item>
 
                     <Form.Item
-                        label="Пароль"
+                        label="РџР°СЂРѕР»СЊ"
                         name="password"
-                        rules={[{ required: true, message: 'Введите пароль!' }]}
+                        rules={[{ required: true, message: 'Р’РІРµРґРёС‚Рµ РїР°СЂРѕР»СЊ!' }]}
                     >
                         <Input.Password />
                     </Form.Item>
 
                     <Form.Item>
                         <Button type="primary" htmlType="submit" loading={loading}>
-                            Войти
+                            Р’РѕР№С‚Рё
                         </Button>
                     </Form.Item>
                 </Form>
             </Card>
         </div>
+    );
+}
+
+function App() {
+    return (
+        <Router>
+            <Routes>
+                <Route path="/" element={<AuthForm />} />
+                <Route path="/profile" element={<Profile />} />
+            </Routes>
+        </Router>
     );
 }
 

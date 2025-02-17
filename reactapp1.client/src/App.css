@@ -9,3 +9,38 @@ th, td {
     padding-left: 1rem;
     padding-right: 1rem;
 }
+.profile-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  
+}
+
+.profile-card {
+    width: 400px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+}
+
+.profile-header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.profile-header .ant-typography {
+    margin: 0;
+}
+
+.profile-card .ant-card-actions {
+    background-color: #fafafa;
+    border-top: 1px solid #e8e8e8;
+}
+
+.profile-card .ant-descriptions-item-label {
+    font-weight: bold;
+    width: 100px;
+}
+
+.profile-card .ant-btn-link {
+    padding: 0;
+}

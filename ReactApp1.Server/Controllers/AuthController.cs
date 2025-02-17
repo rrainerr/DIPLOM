@@ -40,6 +40,7 @@ namespace ReactApp1.Server.Controllers
             _logger.LogInformation("Пользователь {Email} успешно авторизован.", user.Email);
             return Ok(new { message = "Авторизация успешна", user });
         }
+
     }
 
     public class LoginModel
