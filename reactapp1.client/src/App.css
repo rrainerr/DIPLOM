@@ -1,7 +1,5 @@
-﻿#root {
-    max-width: 1280px;
-    margin: 0 auto;
-    padding: 2rem;
+﻿/* Общие стили */
+#root {
     text-align: center;
 }
 
@@ -9,11 +7,28 @@ th, td {
     padding-left: 1rem;
     padding-right: 1rem;
 }
+.demo-logo-vertical {
+    height: 40px;
+    margin: 5px;
+    border-radius: 6px;
+}
+.app-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 2%;
+}
+
+.auth-card {
+    width: 400px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+}
+
 .profile-container {
     display: flex;
     justify-content: center;
     align-items: center;
-  
 }
 
 .profile-card {
@@ -27,9 +42,9 @@ th, td {
     margin-bottom: 20px;
 }
 
-.profile-header .ant-typography {
-    margin: 0;
-}
+    .profile-header .ant-typography {
+        margin: 0;
+    }
 
 .profile-card .ant-card-actions {
     background-color: #fafafa;
@@ -43,4 +58,165 @@ th, td {
 
 .profile-card .ant-btn-link {
     padding: 0;
+}
+
+/* Layout стили */
+.layout {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    margin: 0;
+    min-height: 800px;
+    padding: 10px;
+}
+
+.layout-main {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    align-items: stretch;
+    align-content: stretch;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.layout-content-wrapper {
+    flex: 1;
+}
+
+
+
+.layout-content {
+    background: #fff;
+    padding: 24px;
+    margin: 0;
+    min-height: 100%;
+}
+
+/* Боковая панель */
+.sidebar {
+    background: #fff;
+    min-height: 800px;
+    width: 200px;
+}
+
+.sidebar-menu {
+    height: 100%;
+    border-right: 0;
+    min-height: 800px;
+}
+
+/* Стили для шапки */
+.header {
+    background: #001529;
+    color: #fff;
+    text-align: center;
+    font-size: 20px;
+    padding: 10px;
+    display:flex;
+    justify-content:space-around;
+}
+
+/* Адаптивность для различных разрешений */
+
+/* Экран 1280px и выше */
+@media (min-width: 1280px) {
+    .layout-main {
+        flex-direction: row;
+        width: 1200px;
+    }
+
+    .profile-card {
+        width: 400px;
+    }
+}
+
+/* Экран 1024px - 1279px (планшеты и большие экраны) */
+@media (min-width: 1024px) and (max-width: 1279px) {
+    .layout-main {
+        flex-direction: row;
+        width: 100%;
+    }
+
+    .profile-card {
+        width: 350px;
+    }
+
+    .sidebar {
+        width: 250px;
+    }
+}
+
+/* Экран 768px - 1023px (планшеты и небольшие экраны) */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .layout-main {
+        flex-direction: column; /* Меняем на колонку для мобильных устройств */
+        width: 100%;
+    }
+
+    .sidebar {
+        width: 100%;
+    }
+
+    .profile-container {
+        margin-top: 10px;
+    }
+
+    .profile-card {
+        width: 100%;
+        max-width: 90%;
+    }
+
+    .header {
+        font-size: 18px;
+        padding: 15px;
+    }
+}
+
+/* Экран 480px - 767px (мобильные устройства) */
+@media (min-width: 480px) and (max-width: 767px) {
+    .layout-main {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+    }
+
+    .profile-container {
+        margin-top: 10px;
+    }
+
+    .profile-card {
+        width: 100%;
+        max-width: 90%;
+    }
+
+    .header {
+        font-size: 18px;
+        padding: 15px;
+    }
+}
+
+/* Экран меньше 480px (очень маленькие экраны) */
+@media (max-width: 479px) {
+    .layout-main {
+        flex-direction: column;
+    }
+
+    .profile-container {
+        margin-top: 10px;
+    }
+
+    .profile-card {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .header {
+        font-size: 16px;
+        padding: 10px;
+    }
 }

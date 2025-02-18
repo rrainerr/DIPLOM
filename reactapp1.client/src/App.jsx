@@ -1,89 +1,51 @@
 ﻿import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
-import { Form, Input, Button, Card, message } from 'antd';
+import { Layout } from 'antd';
 import Profile from './Profile';
+import AuthForm from './AuthForm';
 import './App.css';
+import SidebarComponent from './SidebarComponent';
 
-function AuthForm() {
-    const [loading, setLoading] = useState(false);
+const { Content } = Layout;
+
+function App() {
+    const [collapsed, setCollapsed] = useState(false);
     const navigate = useNavigate();
+    const user = JSON.parse(sessionStorage.getItem('user')); // Получаем данные пользователя
 
-    const onFinish = async (values) => {
-        setLoading(true);
-        try {
-            const response = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    Email: values.email,
-                    Password: values.password,
-                }),
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                message.success('Авторизация успешна!');
-                localStorage.setItem('user', JSON.stringify(data.user)); // Сохраняем данные пользователя
-                navigate('/profile'); // Перенаправляем на страницу профиля
-            } else {
-                message.error('Ошибка авторизации. Проверьте данные.');
-            }
-        } catch (error) {
-            message.error('Произошла ошибка при авторизации.');
-            console.error('Ошибка:', error);
-        } finally {
-            setLoading(false);
+    // Если пользователь не авторизован, перенаправляем на страницу авторизации
+    useEffect(() => {
+        if (!user) {
+            navigate('/AuthForm');
         }
+    }, [user, navigate]);
+
+    const toggleCollapse = () => {
+        setCollapsed(!collapsed);
     };
 
     return (
-        <div className="app-container">
-            <Card title="Авторизация" className="auth-card">
-                <Form
-                    name="authForm"
-                    initialValues={{ remember: true }}
-                    onFinish={onFinish}
-                    autoComplete="off"
-                >
-                    <Form.Item
-                        placeholder="Введите почту"
-                        label="Почта"
-                        name="email"
-                        rules={[{ required: true, message: 'Введите почту!' }]}
-                    >
-                        <Input />
-                    </Form.Item>
-
-                    <Form.Item
-                        label="Пароль"
-                        name="password"
-                        rules={[{ required: true, message: 'Введите пароль!' }]}
-                    >
-                        <Input.Password />
-                    </Form.Item>
-
-                    <Form.Item>
-                        <Button type="primary" htmlType="submit" loading={loading}>
-                            Войти
-                        </Button>
-                    </Form.Item>
-                </Form>
-            </Card>
-        </div>
+        <Layout style={{ minHeight: '100vh' }}>
+            {user && <SidebarComponent collapsed={collapsed} />} {/* Условный рендеринг SidebarComponent */}
+            <Layout>
+                <Content className="layout-content">
+                    <Routes>
+                        <Route path="/" element={<Profile />} />
+                        <Route path="/profile" element={<Profile />} />
+                        <Route path="/AuthForm" element={<AuthForm />} />
+                    </Routes>
+                </Content>
+            </Layout>
+        </Layout>
     );
 }
 
-function App() {
+function Root() {
     return (
         <Router>
-            <Routes>
-                <Route path="/" element={<AuthForm />} />
-                <Route path="/profile" element={<Profile />} />
-            </Routes>
+            <App />
         </Router>
     );
 }
 
-export default App;
+export default Root;
