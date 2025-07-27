@@ -220,3 +220,15 @@ th, td {
         padding: 10px;
     }
 }
+
+
+/* Пример для добавления рамки */
+
+
+.ant-table-tbody > tr > td,
+.ant-table-thead > tr > th {
+    border: 1px solid #ddd; /* Серая рамка для ячеек */
+}
+.topo-layer canvas {
+    filter: brightness(1.1) contrast(1.2) drop-shadow(1px 1px 1px rgba(0,0,0,0.5));
+}

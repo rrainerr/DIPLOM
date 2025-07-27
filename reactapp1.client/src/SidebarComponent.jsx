@@ -1,46 +1,162 @@
-﻿import React, { useState } from 'react';
-import { Layout, Menu, Button } from 'antd';
-import { Link } from 'react-router-dom';
+﻿import React, { useState, useEffect } from 'react';
+import { Menu, Layout } from 'antd';
+import { Link, useLocation } from 'react-router-dom';
 import {
     PieChartOutlined,
     DesktopOutlined,
     UserOutlined,
-    MenuUnfoldOutlined,
-    MenuFoldOutlined,
+    CloseOutlined,
 } from '@ant-design/icons';
 import './App.css';
 
 const { Sider } = Layout;
 
-const SidebarComponent = () => {
-    const [collapsed, setCollapsed] = useState(false);
+const SidebarComponent = ({ collapsed, setCollapsed }) => {
+    const [showSecondSider, setShowSecondSider] = useState(false);
+    const location = useLocation(); // Получаем текущий путь
+    const [selectedKeys, setSelectedKeys] = useState(['1']); // Состояние для выбранного элемента меню
 
-    const toggleCollapse = () => {
-        setCollapsed(!collapsed);
+    // Загрузка состояния из localStorage при монтировании компонента
+    useEffect(() => {
+        const savedCollapsed = localStorage.getItem('collapsed') === 'true';
+        const savedShowSecondSider = localStorage.getItem('showSecondSider') === 'true';
+        setCollapsed(savedCollapsed);
+        setShowSecondSider(savedShowSecondSider);
+    }, [setCollapsed]);
+
+    // Сохранение состояния в localStorage при изменении
+    useEffect(() => {
+        localStorage.setItem('collapsed', collapsed);
+    }, [collapsed]);
+
+    useEffect(() => {
+        localStorage.setItem('showSecondSider', showSecondSider);
+    }, [showSecondSider]);
+
+    // Определяем выбранный элемент меню и состояние второго уровня меню на основе текущего пути
+    useEffect(() => {
+        const path = location.pathname;
+
+        // Определяем выбранный элемент меню
+        if (path === '/profile') {
+            setSelectedKeys(['1']);
+        }  else if (path === '/Maping') {
+            setSelectedKeys(['3']);
+        } 
+        else if (path === '/Table') {
+            setSelectedKeys(['2-2']); // Основной пункт меню "Фонд скважин"
+        }
+        else if (path === '/Maping') {
+            setSelectedKeys(['3']);
+        } 
+        else if (path === '/Table_hor') {
+            setSelectedKeys(['2-3']); // Пункт второго уровня меню "Реестр горизонтов"
+        }
+        else if (path === '/Table_stem') {
+            setSelectedKeys(['2-4']); // Пункт второго уровня меню "Реестр горизонтов"
+        }
+        else if (path === '/Table_paker') {
+            setSelectedKeys(['2-5']); // Пункт второго уровня меню "Реестр горизонтов"
+        }
+        else if (path === '/Table_nag') {
+            setSelectedKeys(['2-6']); // Пункт второго уровня меню "Реестр горизонтов"
+        }
+
+   
+
+        // Автоматически открываем второй уровень меню, если находимся на странице, связанной с ним
+        if (path === '/Table' || path === '/Mapp' || path === '/Table_nag' || path === '/Table_hor' || path === '/Table_stem' || path === '/Table_paker') {
+            setShowSecondSider(true);
+            setCollapsed(true);
+          // Скрыть основной Sider
+        } else {
+            setCollapsed(false);
+          
+        }
+    }, [location.pathname, setCollapsed]);
+
+    const handleCalculationsClick = () => {
+        setShowSecondSider(true);
+        setCollapsed(true); // Скрыть основной Sider
     };
 
     return (
-        <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} width={200} >
-            {collapsed ? (
-                <img src="/logo2.png" className="demo-logo-vertical" />
-            ) : (
-                <img src="/logo.png" className="demo-logo-vertical" />
+        <div style={{ display: 'flex', borderRight: '1px solid #ddd' }}>
+            <Sider theme="light" collapsible collapsed={collapsed} onCollapse={setCollapsed} width={200}>
+                {collapsed ? (
+                    <Link onClick={() => {
+                        setShowSecondSider(false);
+                        setCollapsed(false); // Показать основной Sider
+                    }} to="/"><img src="/logo2.png" className="demo-logo-vertical" alt="logo" /></Link>
+                ) : (
+                    <Link onClick={() => {
+                        setShowSecondSider(false);
+                        setCollapsed(false); // Показать основной Sider
+                    }} to="/"><img src="/logo.png" className="demo-logo-vertical" alt="logo" /></Link>
+                )}
+                <Menu theme="light" selectedKeys={selectedKeys} mode="inline">
+                    <Menu.Item key="1" icon={<UserOutlined />}>
+                        <Link onClick={() => {
+                            setShowSecondSider(false);
+                            setCollapsed(false); // Показать основной Sider
+                        }} to="/profile">Профиль</Link>
+                    </Menu.Item>
+
+                    {/* Открытие второго Sider при нажатии */}
+                    <Menu.Item key="2" icon={<PieChartOutlined />} onClick={handleCalculationsClick}>
+                        <Link to="/Table">Фонд скважин</Link>
+                    </Menu.Item>
+
+                    <Menu.Item key="3" icon={<DesktopOutlined />}>
+                        <Link onClick={() => {
+                            setShowSecondSider(false);
+                            setCollapsed(false); // Показать основной Sider
+                        }} to="/Maping">Карта</Link>
+                    </Menu.Item>
+                </Menu>
+            </Sider>
+
+            {/* Второй Sider */}
+            {showSecondSider && (
+                <Sider theme="light" width={240} style={{ borderRight: '1px solid #ddd', borderLeft: '1px solid #ddd' }}>
+                    <div style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0px 10px 0px 5px', background: '#e6f4ff ', borderRadius: '6px',
+                        margin: '10px', height: '40px',
+                    }}>
+                        <p style={{ color: '#1677ff', }}>{<PieChartOutlined />}</p>
+                        <p style={{ color: '#1677ff', }}><strong>Фонд скважин</strong></p>
+                        <CloseOutlined
+                            style={{ color: '#1677ff', cursor: 'pointer' }}
+                            onClick={() => {
+                                setShowSecondSider(false);
+                                setCollapsed(false); // Показать основной Sider
+                            }}
+                        />
+                    </div>
+
+                    <Menu theme="light" selectedKeys={selectedKeys} mode="inline">
+                   
+                        <Menu.Item key="2-2">
+                            <Link to="/Table">Добывавющие скважины</Link>
+                        </Menu.Item>
+                        <Menu.Item key="2-6">
+                            <Link to="/Table_nag">Нагнетательные скважины</Link>
+                        </Menu.Item>
+                        <Menu.Item key="2-3">
+                            <Link to="/Table_hor">Реестр горизонтов</Link>
+                        </Menu.Item>
+                        <Menu.Item key="2-4">
+                            <Link to="/Table_stem">Реестр стволов</Link>
+                        </Menu.Item>
+                        <Menu.Item key="2-5">
+                            <Link to="/Table_paker">Реестр пакеров</Link>
+                        </Menu.Item>
+                      
+
+                    </Menu>
+                </Sider>
             )}
-            <Menu theme="dark" defaultSelectedKeys={['1']} mode="inline">
-                <Menu.Item key="1" icon={<UserOutlined />}>
-                    <Link to="/profile">Профиль</Link>
-                </Menu.Item>
-
-                <Menu.Item key="2" icon={<PieChartOutlined />}>
-                    <Link to="/">Расчеты</Link>
-                </Menu.Item>
-
-                <Menu.Item key="3" icon={<DesktopOutlined />}>
-                    <Link to="/">Карта</Link>
-                </Menu.Item>
-
-            </Menu>
-        </Sider>
+        </div>
     );
 };
 

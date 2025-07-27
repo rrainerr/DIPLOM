@@ -19,5 +19,11 @@ public partial class User
 
     public long IdRole { get; set; }
 
+    public long? IdWorkshop { get; set; }
+
     public virtual Role IdRoleNavigation { get; set; } = null!;
+
+    public virtual Workshop? IdWorkshopNavigation { get; set; }
+
+    public virtual ICollection<Measuring> Measurings { get; set; } = new List<Measuring>();
 }
