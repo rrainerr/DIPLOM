@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using ReactApp1.Server.Models; // Убедитесь, что это правильное пространство имен для PostgresContext
+using static ReactApp1.Server.Controllers.CrmCalculatorController;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,7 +13,7 @@ builder.Services.AddCors(options =>
         policy.AllowAnyOrigin()
               .AllowAnyMethod()
               .AllowAnyHeader()));
-
+builder.Services.AddScoped<AverageWellDataService>();
 // Регистрируем контекст базы данных
 builder.Services.AddDbContext<PostgresContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));

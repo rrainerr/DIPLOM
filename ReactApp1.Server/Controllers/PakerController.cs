@@ -96,41 +96,89 @@ namespace ReactApp1.Server.Controllers
         [HttpPut("table/{id}")]
         public async Task<IActionResult> UpdatePacker(long id, [FromBody] PackerUpdateDto updateDto)
         {
-            var packer = await _context.Packers.FindAsync(id);
+            var packer = await _context.Packers
+                .Include(p => p.IdWellNavigation)
+                    .ThenInclude(w => w.Horizonts)
+                        .ThenInclude(h => h.Stems)
+                .Include(p => p.IdWellNavigation)
+                    .ThenInclude(w => w.Stems)
+                        .ThenInclude(s => s.Points)
+                .FirstOrDefaultAsync(p => p.IdPacker == id);
+
             if (packer == null)
             {
-                return NotFound();
+                return NotFound("Packer not found");
             }
 
-            var well = await _context.Wells.FirstOrDefaultAsync(w => w.IdWell == packer.IdWell);
-            if (well == null)
+            if (packer.IdWellNavigation == null)
             {
                 return BadRequest("Well not found");
             }
 
-            // Get all stems for this well
-            var stems = await _context.Stems
-                .Where(s => s.IdWell == packer.IdWell)
-                .ToListAsync();
-
-            // Update packer depth first
+            // Сохраняем старую глубину для сравнения
+            var oldDepth = packer.Depth;
             packer.Depth = updateDto.Depth;
 
-            bool allStemsInactive = true;
+            var well = packer.IdWellNavigation;
+            bool hasActiveHorizonts = false;
 
-            foreach (var stem in stems)
+            // Обрабатываем все горизонты скважины
+            foreach (var horizont in well.Horizonts)
             {
-                // Get all points for this specific stem
-                var pointsForStem = await _context.Points
-                    .Where(p => p.IdStem == stem.IdStem)
-                    .ToListAsync();
+                bool isHorizontActive = false;
 
+                // Проверяем все стволы горизонта
+                foreach (var stem in horizont.Stems)
+                {
+                    bool stemShouldBeActive = false;
+
+                    // Проверяем точки ствола, если они есть
+                    if (stem.Points.Any())
+                    {
+                        foreach (var point in stem.Points)
+                        {
+                            if (point.Depth <= updateDto.Depth)
+                            {
+                                stemShouldBeActive = true;
+                                break;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Если точек нет, проверяем глубину ствола
+                        if (stem.Depth <= updateDto.Depth)
+                        {
+                            stemShouldBeActive = true;
+                        }
+                    }
+
+                    stem.Work = stemShouldBeActive ? 1 : 0;
+
+                    // Если хотя бы один ствол горизонта активен, горизонт активен
+                    if (stemShouldBeActive)
+                    {
+                        isHorizontActive = true;
+                    }
+                }
+
+                // Обновляем состояние горизонта
+                horizont.SostPl = isHorizontActive ? 1 : 0;
+
+                if (isHorizontActive)
+                {
+                    hasActiveHorizonts = true;
+                }
+            }
+
+            // Обрабатываем все стволы скважины, не привязанные к горизонтам
+            foreach (var stem in well.Stems.Where(s => s.IdHorizont == null))
+            {
                 bool stemShouldBeActive = false;
 
-                if (pointsForStem.Any())
+                if (stem.Points.Any())
                 {
-                    // Check points for this stem
-                    foreach (var point in pointsForStem)
+                    foreach (var point in stem.Points)
                     {
                         if (point.Depth <= updateDto.Depth)
                         {
@@ -141,7 +189,6 @@ namespace ReactApp1.Server.Controllers
                 }
                 else
                 {
-                    // If no points, check stem depth directly
                     if (stem.Depth <= updateDto.Depth)
                     {
                         stemShouldBeActive = true;
@@ -149,35 +196,35 @@ namespace ReactApp1.Server.Controllers
                 }
 
                 stem.Work = stemShouldBeActive ? 1 : 0;
-
-                if (stem.Work == 1)
-                {
-                    allStemsInactive = false;
-                }
             }
 
-            // Update link status based on all stems
-            if (well.IdType == 1)
+            // Обновляем состояние связи (Link) в зависимости от активных горизонтов
+            var link = well.IdType == 1
+                ? await _context.Links.FirstOrDefaultAsync(l => l.IdWell == well.IdWell)
+                : await _context.Links.FirstOrDefaultAsync(l => l.WellLink == well.IdWell);
+
+            if (link != null)
             {
-                var link = await _context.Links.FirstOrDefaultAsync(l => l.IdWell == packer.IdWell);
-                if (link != null)
-                {
-                    link.Status = allStemsInactive ? 0 : 1;
-                }
-            }
-            else if (well.IdType == 2)
-            {
-                var link = await _context.Links.FirstOrDefaultAsync(l => l.WellLink == packer.IdWell);
-                if (link != null)
-                {
-                    link.Status = allStemsInactive ? 0 : 1;
-                }
+                link.Status = hasActiveHorizonts ? 1 : 0;
             }
 
             try
             {
                 await _context.SaveChangesAsync();
-                return Ok(packer);
+
+                // Возвращаем обновленные данные пакера
+                var result = new
+                {
+                    packer.IdPacker,
+                    packer.Name,
+                    packer.Depth,
+                    packer.IdWell,
+                    WellName = packer.IdWellNavigation?.Name,
+                    HasActiveHorizonts = hasActiveHorizonts,
+                    LinkStatus = link?.Status
+                };
+
+                return Ok(result);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -191,7 +238,7 @@ namespace ReactApp1.Server.Controllers
                 }
             }
         }
-      
+
         public class PackerUpdateDto
         {
             public double? Depth { get; set; }

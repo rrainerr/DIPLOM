@@ -9,7 +9,7 @@ const { Option } = Select;
 const ProfilePage = () => {
     const navigate = useNavigate();
     const user = JSON.parse(sessionStorage.getItem('user'));
-    const isRazrab = user?.roleName === 'Разработчик';
+    const isRazrab = user?.roleName === 'Администратор';
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
     const [modalType, setModalType] = useState(null);
@@ -453,10 +453,18 @@ const ProfilePage = () => {
     };
 
     return (
-        <div style={{ backgroundColor: '#f0f2f5', padding: '30px', borderRadius: '8px' }}>
+        <Card
+            
+            title={
+                <span>Профиль</span>
+            }   
+        >
             {contextHolder}
-            <Row gutter={[16, 16]}>
-                <Col span={24}>
+            <Row
+                style={{ backgroundColor: '#f0f2f5', padding: 10, borderRadius: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
+                gutter={[16, 16]}
+            >
+                <Col span={8}>
                     <Card
                         className="profile-card"
                         actions={[
@@ -479,7 +487,7 @@ const ProfilePage = () => {
                     </Card>
                 </Col>
                 {isRazrab && (
-                    <Col span={24}>
+                    <Col span={8}>
                         <Row gutter={[8, 8]}>
                             {[
                                 { type: 'field', text: 'Добавить месторождение' },
@@ -621,7 +629,7 @@ const ProfilePage = () => {
                     </Form.Item>
                 </Form>
             </Modal>
-        </div>
+        </Card>
     );
 };
 

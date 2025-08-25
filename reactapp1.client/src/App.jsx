@@ -39,7 +39,7 @@ function App() {
 
     return (
         <Layout style={{ minHeight: '100vh' }}>
-            {user && <SidebarComponent collapsed={collapsed} setCollapsed={setCollapsed} />} {/* Условный рендеринг SidebarComponent */}
+            {user && <SidebarComponent collapsed={collapsed} setCollapsed={setCollapsed} />} {}
             <Layout>
                 <Content className="layout-content">
                     <Routes>

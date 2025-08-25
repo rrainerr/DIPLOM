@@ -46,9 +46,6 @@ const SidebarComponent = ({ collapsed, setCollapsed }) => {
         else if (path === '/Table') {
             setSelectedKeys(['2-2']); // Основной пункт меню "Фонд скважин"
         }
-        else if (path === '/Maping') {
-            setSelectedKeys(['3']);
-        } 
         else if (path === '/Table_hor') {
             setSelectedKeys(['2-3']); // Пункт второго уровня меню "Реестр горизонтов"
         }
@@ -65,7 +62,7 @@ const SidebarComponent = ({ collapsed, setCollapsed }) => {
    
 
         // Автоматически открываем второй уровень меню, если находимся на странице, связанной с ним
-        if (path === '/Table' || path === '/Mapp' || path === '/Table_nag' || path === '/Table_hor' || path === '/Table_stem' || path === '/Table_paker') {
+        if (path === '/Table' || path === '/Mapp' || path === '/Mapp_nag' || path === '/Table_nag' || path === '/Table_hor' || path === '/Table_stem' || path === '/Table_paker') {
             setShowSecondSider(true);
             setCollapsed(true);
           // Скрыть основной Sider
@@ -107,12 +104,7 @@ const SidebarComponent = ({ collapsed, setCollapsed }) => {
                         <Link to="/Table">Фонд скважин</Link>
                     </Menu.Item>
 
-                    <Menu.Item key="3" icon={<DesktopOutlined />}>
-                        <Link onClick={() => {
-                            setShowSecondSider(false);
-                            setCollapsed(false); // Показать основной Sider
-                        }} to="/Maping">Карта</Link>
-                    </Menu.Item>
+                 
                 </Menu>
             </Sider>
 
@@ -143,7 +135,7 @@ const SidebarComponent = ({ collapsed, setCollapsed }) => {
                             <Link to="/Table_nag">Нагнетательные скважины</Link>
                         </Menu.Item>
                         <Menu.Item key="2-3">
-                            <Link to="/Table_hor">Реестр горизонтов</Link>
+                            <Link to="/Table_hor">Реестр пластов</Link>
                         </Menu.Item>
                         <Menu.Item key="2-4">
                             <Link to="/Table_stem">Реестр стволов</Link>

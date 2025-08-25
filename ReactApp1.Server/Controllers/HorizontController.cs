@@ -51,7 +51,7 @@ public class horizontController : ControllerBase
         try
         {
             var horizonts = await _context.Horizonts
-                .Where(h => h.IdWell == wellId) // или ваше условие связи
+                .Where(h => h.IdWell == wellId) 
                
                 .ToListAsync();
 
@@ -62,7 +62,7 @@ public class horizontController : ControllerBase
             return StatusCode(500, new { error = $"Internal server error: {ex.Message}" });
         }
     }
-    // Получение списка пластов
+
     [HttpGet("add")]
     public async Task<ActionResult<IEnumerable<Horizont>>> GetHorizonts()
     {

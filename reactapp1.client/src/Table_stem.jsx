@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from "react";
-import { Table, Select, Typography } from "antd";
+import { Table, Select, Typography, Card } from "antd";
 import { useNavigate } from 'react-router-dom';
 import './App.css';
 
@@ -61,7 +61,7 @@ const HorizonTable = () => {
     // Колонки таблицы
     const columns = [
         {
-            title: "№ скважины",
+            title: "№ Скважины",
             dataIndex: "wellName",
             key: "wellName",
         },
@@ -90,6 +90,12 @@ const HorizonTable = () => {
     ];
 
     return (
+        <Card
+            title={
+                <div style={{ display: 'flex', justifyContent: 'flex-start', }}>
+                    <span>Реестр стволов скважин</span>
+                </div>
+            }>
         <Table
             columns={columns}
             dataSource={data}
@@ -111,7 +117,8 @@ const HorizonTable = () => {
                 ),
             }}
             scroll={{ x: "max-content", y: 400 }}
-        />
+            />
+        </Card>
     );
 };
 

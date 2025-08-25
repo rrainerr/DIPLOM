@@ -7,26 +7,117 @@ using System.Linq;
 using Microsoft.ML;
 using Microsoft.ML.Data;
 using Microsoft.ML.Transforms.TimeSeries;
+using System.Linq.Expressions;
 
 namespace ReactApp1.Server.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class crmCalculatorController : ControllerBase
+    public class CrmCalculatorController : ControllerBase
     {
         private readonly PostgresContext _db;
-        private readonly ILogger<crmCalculatorController> _logger;
+        private readonly ILogger<CrmCalculatorController> _logger;
         private readonly MLContext _mlContext;
+        private readonly AverageWellDataService _avgDataService;
 
-        public crmCalculatorController(PostgresContext db, ILogger<crmCalculatorController> logger)
+        public CrmCalculatorController(
+          PostgresContext db,
+          ILogger<CrmCalculatorController> logger,
+          AverageWellDataService avgDataService)
         {
             _db = db;
             _logger = logger;
             _mlContext = new MLContext();
+            _avgDataService = avgDataService;
+        }
+        private async Task<(Dictionary<string, double> averages, List<MissingDataRequest> missingData)> ApplyAverageValues(Well well, Horizont horizon)
+        {
+            var averages = await _avgDataService.GetAverageValuesAsync();
+            var missingDataRequests = new List<MissingDataRequest>();
+
+            if (well.DrainageRadius == null || well.DrainageRadius <= 0)
+            {
+                missingDataRequests.Add(new MissingDataRequest
+                {
+                    ParameterName = "DrainageRadius",
+                    Description = "Радиус дренирования скважины",
+                    DefaultValue = averages["DrainageRadius"],
+                    IsCritical = true
+                });
+                well.DrainageRadius = averages["DrainageRadius"];
+                _logger.LogInformation($"Using average DrainageRadius: {well.DrainageRadius}");
+            }
+
+            if (horizon.Permeability == null || horizon.Permeability <= 0)
+            {
+                missingDataRequests.Add(new MissingDataRequest
+                {
+                    ParameterName = "Permeability",
+                    Description = "Проницаемость пласта",
+                    DefaultValue = averages["Permeability"],
+                    IsCritical = true
+                });
+                horizon.Permeability = averages["Permeability"];
+                _logger.LogInformation($"Using average Permeability: {horizon.Permeability}");
+            }
+            if (horizon.Porosity == null || horizon.Porosity <= 0)
+            {
+                missingDataRequests.Add(new MissingDataRequest
+                {
+                    ParameterName = "Porosity",
+                    Description = "Пористость пласта",
+                    DefaultValue = averages["Porosity"],
+                    IsCritical = true
+                });
+                horizon.Porosity = averages["Porosity"];
+                _logger.LogInformation($"Using average Porosity: {horizon.Porosity}");
+            }
+
+            if (horizon.Thickness == null || horizon.Thickness <= 0)
+            {
+                missingDataRequests.Add(new MissingDataRequest
+                {
+                    ParameterName = "Thickness",
+                    Description = "Толщина пласта",
+                    DefaultValue = averages["Thickness"],
+                    IsCritical = true
+                });
+                horizon.Thickness = averages["Thickness"];
+                _logger.LogInformation($"Using average Thickness: {horizon.Thickness}");
+            }
+
+            if (horizon.Viscosity == null || horizon.Viscosity <= 0)
+            {
+                missingDataRequests.Add(new MissingDataRequest
+                {
+                    ParameterName = "Viscosity",
+                    Description = "Вязкость флюида",
+                    DefaultValue = averages["Viscosity"],
+                    IsCritical = true
+                });
+                horizon.Viscosity = averages["Viscosity"];
+                _logger.LogInformation($"Using average Viscosity: {horizon.Viscosity}");
+            }
+
+            if (horizon.Compressibility == null || horizon.Compressibility <= 0)
+            {
+                missingDataRequests.Add(new MissingDataRequest
+                {
+                    ParameterName = "Compressibility",
+                    Description = "Сжимаемость пласта",
+                    DefaultValue = averages["Compressibility"],
+                    IsCritical = true
+                });
+                horizon.Compressibility = averages["Compressibility"];
+                _logger.LogInformation($"Using average Compressibility: {horizon.Compressibility}");
+            }
+
+
+            return (averages, missingDataRequests);
         }
 
-        [HttpGet("{producerId}")]
-        public IActionResult CalculateCrmRatios(int producerId)
+        [HttpGet("ratios/{producerId}")]
+        public async Task<ActionResult<CrmCalculationResponse>> CalculateCrmRatiosAsync(int producerId)
         {
             try
             {
@@ -42,9 +133,6 @@ namespace ReactApp1.Server.Controllers
                 var activeLinks = _db.Links
                     .Where(l => l.Status == 1 && l.WellLink == producerId)
                     .ToList();
-
-                if (!activeLinks.Any())
-                    return Ok(new { Message = "Нет активных нагнетателей" });
 
                 var wellIds = activeLinks.Select(l => l.IdWell).ToList();
                 wellIds.Add(producerId);
@@ -65,6 +153,27 @@ namespace ReactApp1.Server.Controllers
                 var results = new List<CrmRatioResult>();
                 var injectorTotals = new Dictionary<long, double>();
                 var forecastedTotals = new Dictionary<long, double>();
+                var allMissingData = new List<MissingDataRequest>();
+
+                // Применяем усреднённые значения для производителя
+                var prodHorizont = producer.Horizonts.FirstOrDefault(h => h.SostPl == 1 || h.SostPl == 3);
+                if (prodHorizont == null)
+                    return BadRequest("Не найден продуктивный горизонт");
+
+                var (_, prodMissingData) = await ApplyAverageValues(producer, prodHorizont);
+                allMissingData.AddRange(prodMissingData.Select(m => new MissingDataRequest
+                {
+                    ParameterName = m.ParameterName,
+                    Description = m.Description,
+                    DefaultValue = m.DefaultValue,
+                    IsCritical = m.IsCritical,
+                    WellId = producerId,
+                    WellName = producer.Name ?? "Неизвестно",
+                    IsProducer = true
+                }));
+
+                // Словарь для связи параметров с нагнетательными скважинами
+                var injectorInfo = new Dictionary<long, (string Name, long IdWell)>();
 
                 foreach (var link in activeLinks)
                 {
@@ -75,21 +184,52 @@ namespace ReactApp1.Server.Controllers
                     if (injector == null)
                         continue;
 
-                    var prodHorizont = producer.Horizonts.FirstOrDefault(h => h.SostPl == 1 || h.SostPl == 3);
-                    var injHorizont = injector.Horizonts.FirstOrDefault(h => h.SostPl == 1 || h.SostPl == 3);
+                    // Сохраняем информацию о нагнетательной скважине с проверкой на null
+                    injectorInfo[link.IdLink] = (injector.Name ?? "Неизвестно", injector.IdWell);
 
-                    if (prodHorizont == null || injHorizont == null)
+                    var injHorizont = injector.Horizonts.FirstOrDefault(h => h.SostPl == 1 || h.SostPl == 3);
+                    if (injHorizont == null)
                         continue;
+
+                    var (_, injMissingData) = await ApplyAverageValues(injector, injHorizont);
+                    allMissingData.AddRange(injMissingData.Select(m => new MissingDataRequest
+                    {
+                        ParameterName = m.ParameterName,
+                        Description = m.Description,
+                        DefaultValue = m.DefaultValue,
+                        IsCritical = m.IsCritical,
+                        WellId = injector.IdWell,
+                        WellName = injector.Name,
+                        LinkId = link.IdLink,
+                        IsProducer = false
+                    }));
+                }
+
+                // Расчет CRM коэффициентов
+                foreach (var link in activeLinks)
+                {
+                    var injector = _db.Wells
+                        .Include(w => w.Horizonts)
+                        .FirstOrDefault(w => w.IdWell == link.IdWell);
+
 
                     double producerRate = latestWellData.TryGetValue(producerId, out var prodData) ? prodData?.Rate ?? 1 : 1;
                     double injectorRate = latestWellData.TryGetValue(injector.IdWell, out var injData) ? injData?.Rate ?? 1 : 1;
 
-                    double crmRatio = CalculateCrmRatio(producer, injector, link, prodHorizont, injHorizont, producerRate, injectorRate);
+                    prodHorizont = producer.Horizonts.FirstOrDefault(h => h.SostPl == 1 || h.SostPl == 3);
+                    var injHorizont = _db.Wells
+                        .Include(w => w.Horizonts)
+                        .FirstOrDefault(w => w.IdWell == injector.IdWell)?
+                        .Horizonts.FirstOrDefault(h => h.SostPl == 1 || h.SostPl == 3);
 
-                    if (link.Lastratio.HasValue && link.Lastratio > 0)
-                    {
-                        crmRatio = 0.8 * crmRatio + 0.2 * link.Lastratio.Value;
-                    }
+                    if (prodHorizont == null || injHorizont == null)
+                        continue;
+
+                    double crmRatio = CalculateCrmRatio(producer,
+                       injector, 
+                        link, prodHorizont, injHorizont, producerRate, injectorRate);
+
+                    
 
                     var historicalData = _db.Measurings
                         .Where(m => m.IdLink == link.IdLink)
@@ -98,7 +238,6 @@ namespace ReactApp1.Server.Controllers
 
                     double forecastedRatio = ForecastRatio(historicalData, crmRatio);
 
-                    // Сохраняем суммы для нормализации
                     injectorTotals[injector.IdWell] = crmRatio;
                     forecastedTotals[injector.IdWell] = forecastedRatio;
 
@@ -117,27 +256,443 @@ namespace ReactApp1.Server.Controllers
                     });
                 }
 
-                // Нормализуем оба набора коэффициентов
                 NormalizeRatios(results, injectorTotals, activeLinks);
                 NormalizeForecastedRatios(results, forecastedTotals, activeLinks);
 
-                return Ok(results);
+                // Формируем AppliedDefaults
+                var appliedDefaults = allMissingData.Select(m => new AppliedDefaultValue
+                {
+                    Parameter = m.ParameterName,
+                    Value = m.DefaultValue ?? 0,
+                    Source = "Среднее значение из БД",
+                    WellId = m.IsProducer ? producerId : (int)m.WellId,
+                    WellName = m.WellName
+                }).ToList();
+
+                return Ok(new CrmCalculationResponse
+                {
+                    Results = results,
+                    AppliedDefaults = appliedDefaults
+                });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Ошибка расчета CRM модели");
+                _logger.LogError(ex, "Ошибка расчета CRM коэффициентов");
                 return StatusCode(500, "Внутренняя ошибка сервера");
             }
         }
 
-        // Новая функция для нормализации прогнозируемых значений
-        private void NormalizeForecastedRatios(List<CrmRatioResult> results,
+        [HttpGet("production/{producerId}")]
+        public async Task<IActionResult> CalculateProduction(int producerId)
+        {
+            try
+            {
+                // Получаем рассчитанные CRM коэффициенты
+                var ratiosResponse = await CalculateCrmRatiosAsync(producerId);
+
+                if (ratiosResponse.Result is not OkObjectResult okResult ||
+                    okResult.Value is not CrmCalculationResponse crmResponse)
+                {
+                    return BadRequest("Не удалось получить данные о коэффициентах");
+                }
+                var productionHistory1 = _db.WellData
+                   .Where(w => w.IdWell == producerId)
+                   .OrderBy(w => w.Year)
+                   .ThenBy(w => w.Month)
+                   .Take(24) // Последние 2 года
+                   .Select(w => new HistoricalProduction
+                   {
+                       Date = new DateTime((int)(w.Year ?? DateTime.Now.Year),
+                                         (int)(w.Month ?? 1), 1),
+                       Value = w.Rate ?? 0,
+                       Type = "actual"
+                   })
+                   .ToList();
+                var ratios = crmResponse.Results;
+
+                var lastHistoryDate = productionHistory1.Max(h => h.Date);
+                // Вычисляем количество месяцев между последней датой и текущей датой
+                var monthsToForecast = (DateTime.Now.Year - lastHistoryDate.Year) * 12 + DateTime.Now.Month - lastHistoryDate.Month;
+                // Генерируем прогноз на вычисленное количество месяцев
+                var forecast = GenerateProductionForecast(productionHistory1, Math.Max(monthsToForecast, 1));
+
+                var producer = _db.Wells
+                    .Include(w => w.Horizonts)
+                    .FirstOrDefault(w => w.IdWell == producerId);
+                if (producer == null) return NotFound("Скважина не найдена");
+
+                // Получаем последние данные по добывающей скважине
+                var currentProductionData = _db.WellData
+                    .Where(w => w.IdWell == producerId)
+                    .OrderByDescending(w => w.Year)
+                    .ThenByDescending(w => w.Month)
+                    .FirstOrDefault();
+
+                // Получаем текущие данные по нагнетательным скважинам
+                var injectorIds = ratios.Select(r => r.InjectorId.Value).ToList();
+                var currentInjectionData = _db.Wells
+                    .Where(w => injectorIds.Contains(w.IdWell))
+                    .Select(w => new {
+                        w.IdWell,
+                        CurrentInjection = _db.WellData
+                            .Where(wd => wd.IdWell == w.IdWell)
+                            .OrderByDescending(wd => wd.Year)
+                            .ThenByDescending(wd => wd.Month)
+                            .FirstOrDefault()
+                    })
+                    .ToDictionary(
+                        x => x.IdWell,
+                        x => x.CurrentInjection?.Rate ?? 0
+                    );
+
+                // Получаем исторические данные для расчетов
+                var productionHistory = _db.WellData
+                    .Where(w => w.IdWell == producerId)
+                    .OrderByDescending(w => w.Year)
+                    .ThenByDescending(w => w.Month)
+                    .Take(12)
+                    .ToList();
+
+                var injectionHistory = _db.WellData
+                    .Where(w => injectorIds.Contains(w.IdWell.Value))
+                    .ToList()
+                    .GroupBy(w => w.IdWell)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.OrderByDescending(w => w.Year)
+                              .ThenByDescending(w => w.Month)
+                              .Take(12)
+                              .ToList()
+                    );
+
+                // Рассчитываем параметры CRM
+                double tau = CalculateTauParameter(producer);
+                var crmRatios = ratios.ToDictionary(r => r.InjectorId.Value, r => r.CalculatedRatio);
+
+                // Расчет дебита и приемистости
+                double productionRate = CalculateProductionRate(productionHistory, injectionHistory, crmRatios, tau);
+
+                var injectionRates = ratios.ToDictionary(
+                    r => r.InjectorId.Value,
+                    r => CalculateInjectionRate(
+                        injectionHistory.TryGetValue(r.InjectorId.Value, out var data) ? data : new List<WellDatum>(),
+                        r.CalculatedRatio,
+                        tau
+                    )
+                );
+
+                return Ok(new ProductionResult
+                {
+                    ProducerId = producerId,
+                    ProductionRate = productionRate,
+                    CurrentProduction = currentProductionData?.Rate ?? 0,
+                    InjectionRates = injectionRates,
+                    CurrentInjectionRates = currentInjectionData,
+                    TimeConstant = tau,
+                    ConnectivityFactors = crmRatios,
+                    AppliedDefaults = crmResponse.AppliedDefaults,
+                    HistoricalProduction = productionHistory1,
+                    ForecastedProduction = forecast
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка расчета параметров добычи");
+                return StatusCode(500, "Внутренняя ошибка сервера");
+            }
+        }
+        private List<HistoricalProduction> GenerateProductionForecast(List<HistoricalProduction> history, int months)
+        {
+            if (history.Count < 3) return new List<HistoricalProduction>();
+
+            try
+            {
+                var dataView = _mlContext.Data.LoadFromEnumerable(
+                    history.Select(h => new ProductionData
+                    {
+                        Date = h.Date,
+                        Value = (float)h.Value
+                    })
+                );
+
+                var forecastingPipeline = _mlContext.Forecasting.ForecastBySsa(
+                    outputColumnName: "ForecastedValues",
+                    inputColumnName: "Value",
+                    windowSize: 3,
+                    seriesLength: history.Count,
+                    trainSize: history.Count,
+                    horizon: months,
+                    confidenceLevel: 0.95f);
+
+                var forecaster = forecastingPipeline.Fit(dataView);
+                var forecastingEngine = forecaster.CreateTimeSeriesEngine<ProductionData, ProductionForecast>(_mlContext);
+                var forecast = forecastingEngine.Predict();
+
+                var result = new List<HistoricalProduction>();
+                DateTime lastDate = history.Last().Date;
+
+                for (int i = 0; i < months; i++)
+                {
+                    result.Add(new HistoricalProduction
+                    {
+                        Date = lastDate.AddMonths(i + 1),
+                        Value = forecast.ForecastedValues[i],
+                        Type = "forecast"
+                    });
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка генерации прогноза");
+                return new List<HistoricalProduction>();
+            }
+        }
+        private double CalculateTauParameter(Well producer)
+        {
+            try
+            {
+                var horizon = producer.Horizonts.FirstOrDefault(h => h.SostPl == 1 || h.SostPl == 3);
+                if (horizon == null)
+                {
+                    _logger.LogWarning($"Не найден активный горизонт для скважины {producer.IdWell}");
+                    return 1.0;
+                }
+                ApplyAverageValues(producer, horizon);
+                // Параметры пласта
+                double permeability = horizon.Permeability ?? 0; // мД
+                double thickness = horizon.Thickness ?? 10; // м
+                double porosity = horizon.Porosity ?? 0.2; // доли единицы
+                double viscosity = horizon.Viscosity ?? 1; // сПз
+                double compressibility = horizon.Compressibility ?? 1e-5; // 1/атм
+
+                // Параметры скважины
+                double drainageRadius = producer.DrainageRadius ?? 500; // м
+                double wellRadius = producer.WellRadius ?? 0.1; // м
+                double skinFactor = producer.SkinFactors?
+                    .OrderByDescending(s => s.Date)
+                    .FirstOrDefault()?
+                    .SkinFactor1 ?? 0;
+
+                // Расчет порового объема
+                double drainageArea = Math.PI * Math.Pow(drainageRadius, 2);
+                double V = drainageArea * thickness * porosity;
+
+                // Расчет индекса продуктивности
+                double J = CalculateProductivityIndex(
+                    permeability,
+                    thickness,
+                    viscosity,
+                    drainageRadius,
+                    wellRadius,
+                    skinFactor);
+
+                // Постоянная времени
+                double tau = (compressibility * V) / Math.Max(J, 0.001);
+
+                _logger.LogInformation($"Рассчитаны параметры для скв. {producer.IdWell}: V={V:F2} м³, J={J:F2}, τ={tau:F2} дней");
+                return tau;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Ошибка расчета τ для скважины {producer.IdWell}");
+                return 1.0;
+            }
+        }
+
+        private double CalculateProductionRate(
+            List<WellDatum> productionHistory,
+            Dictionary<long?, List<WellDatum>> injectionHistory,
+            Dictionary<long, double> crmRatios,
+            double tau)
+        {
+            if (productionHistory.Count == 0) return 0;
+
+            var current = productionHistory.FirstOrDefault();
+            var previous = productionHistory.Skip(1).FirstOrDefault();
+
+            if (current == null || previous == null)
+                return productionHistory.First().Rate ?? 0;
+
+            double totalWeightedInjection = 0;
+            foreach (var injector in injectionHistory)
+            {
+                if (!crmRatios.TryGetValue(injector.Key.Value, out var fij)) continue;
+
+                var injData = injector.Value.Take(2).ToList();
+                if (injData.Count < 2) continue;
+
+                double currentInj = injData[0].Rate ?? 0;
+                double prevInj = injData[1].Rate ?? 0;
+                double avgInj = (currentInj + prevInj) / 2;
+
+                totalWeightedInjection += fij * avgInj;
+            }
+
+            DateTime currentDate = new DateTime((int)(current.Year ?? DateTime.Now.Year),
+                                    (int)(current.Month ?? 1), 1);
+            DateTime prevDate = new DateTime((int)(previous.Year ?? DateTime.Now.Year),
+                                    (int)(previous.Month ?? 1), 1);
+
+            double deltaT = (currentDate - prevDate).TotalDays / 30.0;
+            if (deltaT <= 0) deltaT = 1;
+
+            double Q_prev = previous.Rate ?? 0;
+            double Q_new = (Q_prev + (totalWeightedInjection * deltaT / tau)) /
+                           (1 + deltaT / tau);
+
+            return Q_new;
+        }
+
+        private double CalculateInjectionRate(
+            List<WellDatum> injectionHistory,
+            double fij,
+            double tau)
+        {
+            if (injectionHistory.Count == 0) return 0;
+
+            var current = injectionHistory.FirstOrDefault();
+            var previous = injectionHistory.Skip(1).FirstOrDefault();
+
+            if (current == null || previous == null)
+                return injectionHistory.First().Rate ?? 0;
+
+            DateTime currentDate = new DateTime((int)(current.Year ?? DateTime.Now.Year),
+                                    (int)(current.Month ?? 1), 1);
+            DateTime prevDate = new DateTime((int)(previous.Year ?? DateTime.Now.Year),
+                                    (int)(previous.Month ?? 1), 1);
+
+            double deltaT = (currentDate - prevDate).TotalDays / 30.0;
+            if (deltaT <= 0) deltaT = 1;
+
+            double I_prev = previous.Rate ?? 0;
+            double I_current = current.Rate ?? 0;
+
+            double I_new = (I_prev + (fij * I_current * deltaT / tau)) /
+                           (1 + deltaT / tau);
+
+            return I_new;
+        }
+
+        private double CalculateCrmRatio(Well producer, Well injector, Link link,
+                                 Horizont prodHorizont, Horizont injHorizont,
+                                 double producerRate, double injectorRate)
+        {
+            double permeability = prodHorizont.Permeability ?? 0;
+            double thickness = prodHorizont.Thickness ?? 0;
+            double viscosity = prodHorizont.Viscosity ?? 1;
+
+            double khProducer = permeability * thickness;
+            double khInjector = (injHorizont.Permeability ?? 0) * (injHorizont.Thickness ?? 0);
+
+            if (khProducer <= 0 || khInjector <= 0)
+                return 0;
+
+            double mobilityRatio = (khProducer / viscosity) / (khInjector / viscosity);
+            double distance = CalculateDistance(
+                producer.Latitude,
+                producer.Longitude,
+                injector.Latitude,
+                injector.Longitude);
+
+            double rateRatio = injectorRate / (producerRate + 0.0001);
+
+            double skin = producer.SkinFactors?
+                .OrderByDescending(s => s.Date)
+                .FirstOrDefault()?.SkinFactor1 ?? 0;
+
+            double drainageRadius = producer.DrainageRadius ?? 500;
+            double wellRadius = producer.WellRadius ?? 0.1;
+
+            double J = CalculateProductivityIndex(
+                permeability, thickness, viscosity,
+                drainageRadius, wellRadius, skin);
+
+            double crmRatio = (khInjector * rateRatio) / (distance * distance * mobilityRatio * J);
+
+            return Math.Clamp(crmRatio, 0, 1);
+        }
+
+        private double CalculateDistance(string lat1, string lon1, string lat2, string lon2)
+        {
+            double? decLat1 = aesController.SimpleAES.DecryptToDouble(lat1);
+            double? decLon1 = aesController.SimpleAES.DecryptToDouble(lon1);
+            double? decLat2 = aesController.SimpleAES.DecryptToDouble(lat2);
+            double? decLon2 = aesController.SimpleAES.DecryptToDouble(lon2);
+
+            if (!decLat1.HasValue || !decLon1.HasValue || !decLat2.HasValue || !decLon2.HasValue)
+                return 0;
+
+            const double R = 6371;
+            var dLat = ToRadians(decLat2.Value - decLat1.Value);
+            var dLon = ToRadians(decLon2.Value - decLon1.Value);
+            var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                    Math.Cos(ToRadians(decLat1.Value)) * Math.Cos(ToRadians(decLat2.Value)) *
+                    Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+            return R * c * 1000;
+        }
+
+        private double ToRadians(double angle) => Math.PI * angle / 180.0;
+
+        private double CalculateProductivityIndex(double permeability, double thickness, double viscosity,
+                                              double drainageRadius, double wellRadius, double skinFactor)
+        {
+            return (2 * Math.PI * permeability * thickness) /
+                   (viscosity * (Math.Log(drainageRadius / wellRadius) + skinFactor)) * 0.008527;
+        }
+
+        private void NormalizeRatios(List<CrmRatioResult> results, Dictionary<long, double> injectorTotals, List<Link> activeLinks)
+        {
+            if (!results.Any()) return;
+
+            var maxAllowedRatios = activeLinks.ToDictionary(
+                l => l.IdWell,
+                l => 1 - (l.Lastratio ?? 0)
+            );
+
+            double totalRatios = results.Sum(r => r.CalculatedRatio);
+            if (totalRatios > 0)
+            {
+                foreach (var item in results)
+                {
+                    item.CalculatedRatio /= totalRatios;
+                }
+            }
+
+            bool needReNormalize = false;
+            foreach (var item in results)
+            {
+                if (maxAllowedRatios.TryGetValue(item.InjectorId, out var maxAllowed))
+                {
+                    if (item.CalculatedRatio > maxAllowed)
+                    {
+                        item.CalculatedRatio = maxAllowed;
+                        needReNormalize = true;
+                    }
+                }
+            }
+
+            if (needReNormalize)
+            {
+                totalRatios = results.Sum(r => r.CalculatedRatio);
+                if (totalRatios > 0)
+                {
+                    foreach (var item in results)
+                    {
+                        item.CalculatedRatio /= totalRatios;
+                    }
+                }
+            }
+        }
+
+       private void NormalizeForecastedRatios(List<CrmRatioResult> results,
                                        Dictionary<long, double> forecastedTotals,
                                        List<Link> activeLinks)
         {
             if (!results.Any()) return;
 
-            // 1. Анализ исторических данных и создание прогноза
             var forecasts = new Dictionary<long, (double value, double weight)>();
 
             foreach (var item in results)
@@ -145,9 +700,8 @@ namespace ReactApp1.Server.Controllers
                 if (!item.InjectorId.HasValue) continue;
 
                 double forecastValue;
-                double confidenceWeight = 1.0; // Вес прогноза (1 = максимальная уверенность)
+                double confidenceWeight = 1.0;
 
-                // Если есть достаточная история (минимум 3 точки)
                 if (item.HistoricalData?.Count >= 3)
                 {
                     var history = item.HistoricalData
@@ -156,24 +710,17 @@ namespace ReactApp1.Server.Controllers
                         .Select(h => h.Ratio.Value)
                         .ToList();
 
-                    // Метод 1: Простое скользящее среднее
                     double sma = history.TakeLast(3).Average();
-
-                    // Метод 2: Линейный тренд
                     double trend = CalculateLinearTrend(history);
-
-                    // Комбинируем подходы
                     forecastValue = (sma * 0.3 + trend * 0.7);
-                    confidenceWeight = 1.5; // Больший вес для прогнозов с историей
+                    confidenceWeight = 1.5;
                 }
                 else
                 {
-                    // Базовый прогноз если данных недостаточно
                     forecastValue = item.CalculatedRatio;
-                    confidenceWeight = 0.8; // Меньший вес
+                    confidenceWeight = 0.8;
                 }
 
-                // Гарантируем минимальное отличие в 5%
                 double minChange = item.CalculatedRatio * 0.05;
                 if (Math.Abs(forecastValue - item.CalculatedRatio) < minChange)
                 {
@@ -185,11 +732,9 @@ namespace ReactApp1.Server.Controllers
                 forecasts[item.InjectorId.Value] = (forecastValue, confidenceWeight);
             }
 
-            // 2. Взвешенная нормализация с учетом уверенности в прогнозах
             double totalWeighted = forecasts.Sum(f => f.Value.value * f.Value.weight);
             if (totalWeighted <= 0) return;
 
-            // 3. Применение системных ограничений
             var maxAllowed = activeLinks.ToDictionary(
                 l => l.IdWell,
                 l => 1 - (l.Lastratio ?? 0)
@@ -209,10 +754,8 @@ namespace ReactApp1.Server.Controllers
                 totalAfterLimits += value;
             }
 
-            // 4. Коррекция и окончательная нормализация
             if (totalAfterLimits > 0)
             {
-                // Распределение с учетом весов
                 double remaining = 1.0 - totalAfterLimits;
                 if (remaining != 0)
                 {
@@ -232,7 +775,6 @@ namespace ReactApp1.Server.Controllers
                     }
                 }
 
-                // Финальная нормализация
                 double finalSum = limitedForecasts.Sum(f => f.Value);
                 foreach (var key in limitedForecasts.Keys.ToList())
                 {
@@ -240,7 +782,6 @@ namespace ReactApp1.Server.Controllers
                 }
             }
 
-            // 5. Применение результатов
             foreach (var item in results)
             {
                 if (item.InjectorId.HasValue && limitedForecasts.TryGetValue(item.InjectorId.Value, out var value))
@@ -250,7 +791,6 @@ namespace ReactApp1.Server.Controllers
             }
         }
 
-        // Вспомогательный метод для расчета линейного тренда
         private double CalculateLinearTrend(List<double> history)
         {
             int n = history.Count;
@@ -267,19 +807,15 @@ namespace ReactApp1.Server.Controllers
             }
 
             double slope = (n * xySum - xSum * ySum) / (n * x2Sum - xSum * xSum);
-            return history.Last() + slope; // Прогнозируем следующее значение
+            return history.Last() + slope;
         }
 
         private double ForecastRatio(List<Measuring> historicalData, double currentRatio)
         {
-            if (historicalData.Count < 5) // Not enough data for forecasting
-            {
-                return currentRatio; // Return current ratio as forecast
-            }
+            if (historicalData.Count < 5) return currentRatio;
 
             try
             {
-                // Convert historical data to ML format
                 var dataView = _mlContext.Data.LoadFromEnumerable(
                     historicalData.Select(h => new RatioData
                     {
@@ -288,7 +824,6 @@ namespace ReactApp1.Server.Controllers
                     })
                 );
 
-                // Create and configure the forecasting pipeline
                 var forecastingPipeline = _mlContext.Forecasting.ForecastBySsa(
                     outputColumnName: "ForecastedRatios",
                     inputColumnName: "Ratio",
@@ -300,201 +835,132 @@ namespace ReactApp1.Server.Controllers
                     confidenceLowerBoundColumn: "LowerBoundRatios",
                     confidenceUpperBoundColumn: "UpperBoundRatios");
 
-                // Train the model
                 var forecaster = forecastingPipeline.Fit(dataView);
-
-                // Create forecasting engine
                 var forecastingEngine = forecaster.CreateTimeSeriesEngine<RatioData, RatioForecast>(_mlContext);
-
-                // Forecast
                 var forecast = forecastingEngine.Predict();
 
-                // Return the forecasted value
                 return forecast.ForecastedRatios[0];
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Ошибка прогнозирования CRM коэффициента");
-                return currentRatio; // Fallback to current ratio if forecasting fails
+                return currentRatio;
             }
         }
-
-        /// <summary>
-        /// Расчет CRM-коэффициента между производителем и нагнетателем
-        /// </summary>
-        /// <param name="producer">Скважина-производитель</param>
-        /// <param name="injector">Скважина-нагнетатель</param>
-        /// <param name="link">Связь между скважинами</param>
-        /// <param name="prodHorizont">Горизонт производителя</param>
-        /// <param name="injHorizont">Горизонт нагнетателя</param>
-        /// <param name="producerRate">Дебит производителя</param>
-        /// <param name="injectorRate">Дебит нагнетателя</param>
-        /// <returns>CRM-коэффициент (0-1)</returns>
-        private double CalculateCrmRatio(Well producer, Well injector, Link link,
-                                 Horizont prodHorizont, Horizont injHorizont,
-                                 double producerRate, double injectorRate)
+        public class AverageWellDataService
         {
-            // 1. Расчет параметров пласта
-            double permeability = prodHorizont.Permeability ?? 0; // Проницаемость
-            double thickness = prodHorizont.Thickness ?? 0; // Толщина пласта
-            double viscosity = prodHorizont.Viscosity ?? 1; // Вязкость
+            private readonly ILogger<CrmCalculatorController> _logger;
+            private readonly PostgresContext _db;
 
-            // 2. Расчет kh (проницаемость * толщина) для обеих скважин
-            double khProducer = permeability * thickness;
-            double khInjector = (injHorizont.Permeability ?? 0) * (injHorizont.Thickness ?? 0);
-
-            if (khProducer <= 0 || khInjector <= 0)
-                return 0;
-
-            // 3. Расчет мобильностного отношения (отношение подвижностей)
-            double mobilityRatio = (khProducer / viscosity) / (khInjector / viscosity);
-
-            // 4. Расчет расстояния между скважинами (в метрах)
-            double distance = CalculateDistance(
-                 (producer.Latitude),
-                 (producer.Longitude),
-                 (injector.Latitude),
-                (injector.Longitude));
-
-            // 5. Отношение дебитов (нагнетатель/производитель)
-            double rateRatio = injectorRate / (producerRate + 0.0001); // +0.0001 чтобы избежать деления на 0
-
-            // 6. Параметры скважины
-            double skin = producer.SkinFactors?
-                .OrderByDescending(s => s.Date)
-                .FirstOrDefault()?.SkinFactor1 ?? 0; // Скин-фактор (последнее значение)
-
-            double drainageRadius = producer.DrainageRadius ?? 500; // Радиус дренирования
-            double wellRadius = producer.WellRadius ?? 0.1; // Радиус скважины
-
-            // 7. Расчет индекса продуктивности (J)
-            double J = CalculateProductivityIndex(
-                permeability, thickness, viscosity,
-                drainageRadius, wellRadius, skin);
-
-            // 8. Основная формула CRM
-            // Формула: (khInjector * rateRatio) / (distance^2 * mobilityRatio * J)
-            double crmRatio = (khInjector * rateRatio) / (distance * distance * mobilityRatio * J);
-
-            // Ограничиваем значение между 0 и 1
-            return Math.Clamp(crmRatio, 0, 1);
-        }
-
-        /// <summary>
-        /// Расчет расстояния между двумя точками по координатам (в метрах)
-        /// </summary>
-        /// <param name="encryptedLat1">Широта точки 1 (зашифрованная)</param>
-        /// <param name="encryptedLon1">Долгота точки 1 (зашифрованная)</param>
-        /// <param name="encryptedLat2">Широта точки 2 (зашифрованная)</param>
-        /// <param name="encryptedLon2">Долгота точки 2 (зашифрованная)</param>
-        /// <returns>Расстояние в метрах</returns>
-        private double CalculateDistance(string encryptedLat1, string encryptedLon1,
-                                 string encryptedLat2, string encryptedLon2)
-        {
-            // Дешифровка координат
-            double? lat1 = aesController.SimpleAES.DecryptToDouble(encryptedLat1);
-            double? lon1 = aesController.SimpleAES.DecryptToDouble(encryptedLon1);
-            double? lat2 = aesController.SimpleAES.DecryptToDouble(encryptedLat2);
-            double? lon2 = aesController.SimpleAES.DecryptToDouble(encryptedLon2);
-
-            // Проверка успешности дешифровки
-            if (!lat1.HasValue || !lon1.HasValue || !lat2.HasValue || !lon2.HasValue)
+            public AverageWellDataService(PostgresContext db, ILogger<CrmCalculatorController> logger)
             {
-                return 0; // Если дешифровка не удалась, возвращаем 0
+                _db = db;
+                _logger = logger;
             }
 
-            // Формула гаверсинусов для расчета расстояния между точками на сфере
-            const double R = 6371; // Радиус Земли в км
-            var dLat = ToRadians(lat2.Value - lat1.Value);
-            var dLon = ToRadians(lon2.Value - lon1.Value);
-            var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
-                    Math.Cos(ToRadians(lat1.Value)) * Math.Cos(ToRadians(lat2.Value)) *
-                    Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
-            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
-            return R * c * 1000; // Переводим в метры
-        }
-
-        /// <summary>
-        /// Преобразование градусов в радианы
-        /// </summary>
-        private double ToRadians(double angle) => Math.PI * angle / 180.0;
-
-        /// <summary>
-        /// Расчет индекса продуктивности (J)
-        /// </summary>
-        /// <param name="permeability">Проницаемость</param>
-        /// <param name="thickness">Толщина пласта</param>
-        /// <param name="viscosity">Вязкость</param>
-        /// <param name="drainageRadius">Радиус дренирования</param>
-        /// <param name="wellRadius">Радиус скважины</param>
-        /// <param name="skinFactor">Скин-фактор</param>
-        /// <returns>Индекс продуктивности</returns>
-        private double CalculateProductivityIndex(double permeability, double thickness, double viscosity,
-                                                  double drainageRadius, double wellRadius, double skinFactor)
-        {
-            // Формула Дюпюи для индекса продуктивности
-            return (2 * Math.PI * permeability * thickness) /
-                   (viscosity * (Math.Log(drainageRadius / wellRadius) + skinFactor)) * 0.008527;
-        }
-
-        /// <summary>
-        /// Нормализация CRM-коэффициентов
-        /// </summary>
-        /// <param name="results">Список результатов</param>
-        /// <param name="injectorTotals">Суммы по нагнетателям</param>
-        /// <param name="activeLinks">Активные связи</param>
-        private void NormalizeRatios(List<CrmRatioResult> results, Dictionary<long, double> injectorTotals, List<Link> activeLinks)
-        {
-            if (!results.Any()) return;
-
-            // 1. Создаем словарь с максимально допустимыми коэффициентами для нагнетателей
-            // Максимальное значение = 1 - предыдущее значение коэффициента
-            var maxAllowedRatios = activeLinks.ToDictionary(
-                l => l.IdWell,
-                l => 1 - (l.Lastratio ?? 0)
-            );
-
-            // 2. Первая нормализация - сумма всех коэффициентов = 1
-            double totalRatios = results.Sum(r => r.CalculatedRatio);
-            if (totalRatios > 0)
+            public async Task<Dictionary<string, double>> GetAverageValuesAsync()
             {
-                foreach (var item in results)
+                try
                 {
-                    item.CalculatedRatio /= totalRatios;
-                }
-            }
-
-            // 3. Проверяем ограничения для нагнетателей
-            bool needReNormalize = false;
-            foreach (var item in results)
-            {
-                if (maxAllowedRatios.TryGetValue(item.InjectorId, out var maxAllowed))
-                {
-                    if (item.CalculatedRatio > maxAllowed)
+                    // Проверяем подключение к БД
+                    if (!await _db.Database.CanConnectAsync())
                     {
-                        item.CalculatedRatio = maxAllowed; // Ограничиваем максимальным значением
-                        needReNormalize = true;
+                        _logger.LogWarning("Нет подключения к БД, используются значения по умолчанию");
+                        return GetDefaultValues();
                     }
+
+                    // Создаем словарь для результатов
+                    var averages = new Dictionary<string, double>();
+
+                    // Рассчитываем средние значения с дополнительными проверками
+
+                    // Пористость
+                    averages["Porosity"] = await GetSafeAverageAsync(
+                        _db.Horizonts.Where(h => h.Porosity != null),
+                        h => h.Porosity,
+                        0.15);
+
+                    // Толщина пласта
+                    averages["Thickness"] = await GetSafeAverageAsync(
+                        _db.Horizonts.Where(h => h.Thickness != null),
+                        h => h.Thickness,
+                        10);
+
+                    // Вязкость
+                    averages["Viscosity"] = await GetSafeAverageAsync(
+                        _db.Horizonts.Where(h => h.Viscosity != null),
+                        h => h.Viscosity,
+                        1);
+
+                    // Проницаемость
+                    averages["Permeability"] = await GetSafeAverageAsync(
+                        _db.Horizonts.Where(h => h.Permeability != null),
+                        h => h.Permeability,
+                        100);
+
+                    // Сжимаемость
+                    averages["Compressibility"] = await GetSafeAverageAsync(
+                        _db.Horizonts.Where(h => h.Compressibility != null),
+                        h => h.Compressibility,
+                        0.0005);
+
+                    // Радиус дренирования
+                    averages["DrainageRadius"] = await GetSafeAverageAsync(
+                        _db.Wells.Where(w => w.DrainageRadius != null),
+                        w => w.DrainageRadius,
+                        500);
+
+                    // Радиус скважины
+                    averages["WellRadius"] = await GetSafeAverageAsync(
+                        _db.Wells.Where(w => w.WellRadius != null),
+                        w => w.WellRadius,
+                        0.1);
+
+                    // Скин-фактор
+                    averages["SkinFactor"] = await GetSafeAverageAsync(
+                        _db.SkinFactors.Where(s => s.SkinFactor1 != null),
+                        s => s.SkinFactor1,
+                        0);
+
+                    return averages;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Ошибка при расчете средних значений");
+                    return GetDefaultValues();
                 }
             }
 
-            // 4. Если были изменения - повторно нормализуем
-            if (needReNormalize)
+            private Dictionary<string, double> GetDefaultValues()
             {
-                totalRatios = results.Sum(r => r.CalculatedRatio);
-                if (totalRatios > 0)
+                return new Dictionary<string, double>
                 {
-                    foreach (var item in results)
-                    {
-                        item.CalculatedRatio /= totalRatios;
-                    }
+                    ["Porosity"] = 0.15,
+                    ["Thickness"] = 10,
+                    ["Viscosity"] = 1,
+                    ["Permeability"] = 100,
+                    ["Compressibility"] = 0.0005,
+                    ["DrainageRadius"] = 500,
+                    ["WellRadius"] = 0.1,
+                    ["SkinFactor"] = 0
+                };
+            }
+            private async Task<double> GetSafeAverageAsync<T>(IQueryable<T> query, Expression<Func<T, double?>> selector, double defaultValue)
+            {
+                try
+                {
+                    if (!await query.AnyAsync())
+                        return defaultValue;
+
+                    var avg = await query.AverageAsync(selector);
+                    return avg ?? defaultValue;
+                }
+                catch
+                {
+                    return defaultValue;
                 }
             }
         }
-
-        /// <summary>
-        /// Класс для хранения результатов расчета CRM
-        /// </summary>
         public class CrmRatioResult
         {
             public long? LinkId { get; set; }
@@ -511,7 +977,26 @@ namespace ReactApp1.Server.Controllers
             public double? Ratio { get; set; }
         }
 
-        // ML.NET data models
+        public class ProductionResult
+        {
+            public int ProducerId { get; set; }
+            public double ProductionRate { get; set; }  // Расчетный дебит
+            public double CurrentProduction { get; set; }  // Текущий фактический дебит
+            public Dictionary<long, double> InjectionRates { get; set; }  // Расчетная приемистость
+            public Dictionary<long, double> CurrentInjectionRates { get; set; }  // Текущая фактическая приемистость
+            public double TimeConstant { get; set; }
+            public Dictionary<long, double> ConnectivityFactors { get; set; }
+            public List<AppliedDefaultValue> AppliedDefaults { get; set; }
+            public List<HistoricalProduction> HistoricalProduction { get; set; }
+            public List<HistoricalProduction> ForecastedProduction { get; set; }
+
+        }
+        public class HistoricalProduction
+        {
+            public DateTime Date { get; set; }
+            public double Value { get; set; }
+            public string Type { get; set; } // "actual" или "forecast"
+        }
         public class RatioData
         {
             [LoadColumn(0)]
@@ -526,6 +1011,45 @@ namespace ReactApp1.Server.Controllers
             public float[] ForecastedRatios { get; set; }
             public float[] LowerBoundRatios { get; set; }
             public float[] UpperBoundRatios { get; set; }
+        }
+        public class ProductionData
+{
+    [LoadColumn(0)]
+    public DateTime Date { get; set; }
+
+    [LoadColumn(1)]
+    public float Value { get; set; }
+}
+
+public class ProductionForecast
+{
+    public float[] ForecastedValues { get; set; }
+}
+        public class MissingDataRequest
+        {
+            public string ParameterName { get; set; }
+            public string Description { get; set; }
+            public double? DefaultValue { get; set; }
+            public bool IsCritical { get; set; }
+            public long? WellId { get; set; }
+            public string WellName { get; set; }
+            public long? LinkId { get; set; }
+            public bool IsProducer { get; set; }
+        }
+
+        public class AppliedDefaultValue
+        {
+            public string Parameter { get; set; }
+            public double Value { get; set; }
+            public string Source { get; set; }
+            public int WellId { get; set; }
+            public string WellName { get; set; }
+        }
+
+        public class CrmCalculationResponse
+        {
+            public List<CrmRatioResult> Results { get; set; }
+            public List<AppliedDefaultValue> AppliedDefaults { get; set; }
         }
     }
 }

@@ -1,22 +1,26 @@
 ﻿import React, { useState, useEffect } from "react";
-import { Table, Button, Modal, Input, Form, Typography, message } from "antd";
+import { Table, Button, Modal, Input, Form, Typography, message, Card} from "antd";
 import { useNavigate } from 'react-router-dom';
 import './App.css';
 
 const { Text } = Typography;
+const { Search } = Input;
 
 const HorizonTable = () => {
     const [data, setData] = useState([]);
+    const [filteredData, setFilteredData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [totalRecords, setTotalRecords] = useState(0);
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [editingRecord, setEditingRecord] = useState(null);
+    const [searchText, setSearchText] = useState("");
     const [form] = Form.useForm();
     const navigate = useNavigate();
     const user = JSON.parse(sessionStorage.getItem('user'));
-    const isRazrab = user?.roleName === 'Разработчик';
+    const isRazrab = user?.roleName === 'Администратор';
+
     // Загрузка данных для таблицы
     const fetchData = async (page, pageSize) => {
         setLoading(true);
@@ -46,6 +50,7 @@ const HorizonTable = () => {
             }));
 
             setData(formattedData);
+            setFilteredData(formattedData); // Инициализируем отфильтрованные данные
             setTotalRecords(result.totalRecords);
         } catch (error) {
             console.error("Ошибка загрузки данных:", error);
@@ -54,9 +59,39 @@ const HorizonTable = () => {
         setLoading(false);
     };
 
+    // Обработчик поиска
+    const handleSearch = (value) => {
+        setSearchText(value);
+        setPage(1); 
+
+        if (!value.trim()) {
+            setFilteredData(data);
+            setTotalRecords(data.length);
+            return;
+        }
+
+        const searchLower = value.toLowerCase();
+        const filtered = data.filter(item =>
+            item.wellName && item.wellName.toLowerCase().includes(searchLower)
+        );
+
+        setFilteredData(filtered);
+        setTotalRecords(filtered.length);
+    };
+
     useEffect(() => {
         fetchData(page, pageSize);
     }, [page, pageSize]);
+
+    // Обновление данных при изменении исходных данных
+    useEffect(() => {
+        if (searchText) {
+            handleSearch(searchText);
+        } else {
+            setFilteredData(data);
+            setTotalRecords(data.length);
+        }
+    }, [data]);
 
     // Обновление данных пакера на сервере
     const updatePacker = async (idPacker, newDepth) => {
@@ -95,10 +130,8 @@ const HorizonTable = () => {
             const values = await form.validateFields();
             const newDepth = values.depth;
 
-            // 1. Обновляем данные на сервере
             const updatedPacker = await updatePacker(editingRecord.idPacker, newDepth);
 
-            // 2. Обновляем данные в таблице
             const updatedData = data.map(item =>
                 item.idPacker === editingRecord.idPacker
                     ? { ...item, depth: newDepth }
@@ -125,7 +158,7 @@ const HorizonTable = () => {
             key: "wellName",
         },
         {
-            title: "Название пакера",
+            title: "Наименование пакера",
             dataIndex: "name",
             key: "name",
         },
@@ -148,60 +181,82 @@ const HorizonTable = () => {
             </Button>
         ),
     };
+
     const columns = isRazrab ? [...baseColumns, actionColumn] : baseColumns;
+
     return (
         <>
-            <Table
-                columns={columns}
-                dataSource={data}
-                rowKey="key"
-                loading={loading}
-                bordered
-                pagination={{
-                    current: page,
-                    pageSize: pageSize,
-                    total: totalRecords,
-                    showSizeChanger: true,
-                    pageSizeOptions: ["10", "20", "50", "100"],
-                    onShowSizeChange: (_, size) => setPageSize(size),
-                    onChange: (page) => setPage(page),
-                    showTotal: (total, range) => (
-                        <Text strong>
-                            {range[0]}-{range[1]} из {total} записей
-                        </Text>
-                    ),
-                }}
-                scroll={{ x: "max-content", y: 400 }}
-            />
-
-            <Modal
-                title={`Редактирование пакера: ${editingRecord?.name}`}
-                visible={isModalVisible}
-                onOk={handleSave}
-                onCancel={() => setIsModalVisible(false)}
-                okText="Сохранить"
-                cancelText="Отмена"
+            <Card
+                title={
+                    <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                        <span>Реестр пакеров скважин</span>
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                            <Search
+                                placeholder="Поиск по номеру скважины"
+                                allowClear
+                                value={searchText}
+                                onChange={(e) => setSearchText(e.target.value)}
+                                onSearch={handleSearch}
+                                onPressEnter={(e) => handleSearch(e.target.value)}
+                                style={{ width: 250 }}
+                            />
+               
+                        </div>
+                    </div>
+                }
             >
-                <Form form={form} layout="vertical">
-                    <Form.Item
-                        label="Скважина"
-                    >
-                        <Input value={editingRecord?.wellName} disabled />
-                    </Form.Item>
-                    <Form.Item
-                        name="depth"
-                        label="Глубина"
-                        rules={[{
-                            required: true,
-                            message: 'Пожалуйста, введите глубину',
-                            pattern: new RegExp(/^[0-9]+(\.[0-9]+)?$/),
-                            message: 'Пожалуйста, введите корректное число'
-                        }]}
-                    >
-                        <Input placeholder="Введите глубину" />
-                    </Form.Item>
-                </Form>
-            </Modal>
+                <Table
+                    columns={columns}
+                    dataSource={filteredData}
+                    rowKey="key"
+                    loading={loading}
+                    bordered
+                    pagination={{
+                        current: page,
+                        pageSize: pageSize,
+                        total: totalRecords,
+                        showSizeChanger: true,
+                        pageSizeOptions: ["10", "20", "50", "100"],
+                        onShowSizeChange: (_, size) => setPageSize(size),
+                        onChange: (page) => setPage(page),
+                        showTotal: (total, range) => (
+                            <Text strong>
+                                {range[0]}-{range[1]} из {total} записей
+                            </Text>
+                        ),
+                    }}
+                    scroll={{ x: "max-content", y: 400 }}
+                />
+
+                <Modal
+                    title={`Редактирование пакера: ${editingRecord?.name}`}
+                    visible={isModalVisible}
+                    onOk={handleSave}
+                    onCancel={() => setIsModalVisible(false)}
+                    okText="Сохранить"
+                    cancelText="Отмена"
+                >
+                    <Form form={form} layout="vertical">
+                        <Form.Item
+                            label="Скважина"
+                        >
+                            <Input value={editingRecord?.wellName} disabled />
+                        </Form.Item>
+                        <Form.Item
+                            name="depth"
+                            label="Глубина"
+                            rules={[{
+                                required: true,
+                                message: 'Пожалуйста, введите глубину',
+                                pattern: new RegExp(/^[0-9]+(\.[0-9]+)?$/),
+                                message: 'Пожалуйста, введите корректное число'
+                            }]}
+                        >
+                            <Input placeholder="Введите глубину" />
+                        </Form.Item>
+                    </Form>
+                </Modal>
+            </Card>
         </>
     );
 };

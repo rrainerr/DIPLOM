@@ -250,7 +250,12 @@ export default defineConfig({
                 changeOrigin: true
             },
 
-            "^/api/crmCalculator/*": {
+            "^/api/CrmCalculator/ratios/*": {
+                target,
+                secure: false,
+                changeOrigin: true
+            },
+            "^/api/CrmCalculator/production/*": {
                 target,
                 secure: false,
                 changeOrigin: true
