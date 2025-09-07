@@ -14,7 +14,7 @@ public class fieldController : ControllerBase
         _context = context;
     }
 
-    // Получение списка месторождений
+
     [HttpGet]
     public async Task<IActionResult> GetFields()
     {
@@ -23,7 +23,7 @@ public class fieldController : ControllerBase
     }
 
 
-    // Добавление нового месторождения
+
     [HttpPost("add")]
     public async Task<IActionResult> AddField([FromBody] Field field)
     {
@@ -43,8 +43,8 @@ public class fieldController : ControllerBase
     {
         try
         {
-            Console.WriteLine($"Received ID: {id}, Type: {id.GetType()}"); // Логируем ID и его тип
-            Console.WriteLine($"Received data: {JsonSerializer.Serialize(field)}"); // Логируем данные
+            Console.WriteLine($"Received ID: {id}, Type: {id.GetType()}"); 
+            Console.WriteLine($"Received data: {JsonSerializer.Serialize(field)}"); 
 
             if (field == null || id != field.IdField)
             {
@@ -73,7 +73,7 @@ public class fieldController : ControllerBase
         }
     }
 
-    // Удаление месторождения
+
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteField(long id)
     {

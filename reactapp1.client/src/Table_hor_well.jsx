@@ -14,7 +14,6 @@ const HorizonTableWell = () => {
     const [pageSize, setPageSize] = useState(10);
     const navigate = useNavigate();
 
-    // Загрузка данных для таблицы
     const fetchData = async (page, pageSize) => {
         setLoading(true);
         try {
@@ -30,12 +29,10 @@ const HorizonTableWell = () => {
             const result = JSON.parse(rawResponse);
             console.log("Ответ от API:", result);
 
-            // Проверяем наличие данных в правильной структуре
             if (!result || !result.horizonts || !result.horizonts.$values || !Array.isArray(result.horizonts.$values)) {
                 throw new Error("Некорректный формат данных от API");
             }
 
-            // Форматируем данные
             const formattedData = result.horizonts.$values.map(item => ({
                 ...item,
                 key: item.idHorizont ? item.idHorizont.toString() : `${Math.random()}`,
@@ -55,7 +52,6 @@ const HorizonTableWell = () => {
         fetchData(page, pageSize);
     }, [page, pageSize]);
 
-    // Колонки таблицы
     const columns = [
         {
             title: "Название горизонта",
@@ -86,7 +82,6 @@ const HorizonTableWell = () => {
                 return "Нет данных";
             },
         },
-        // Добавьте другие колонки по необходимости
     ];
 
     return (

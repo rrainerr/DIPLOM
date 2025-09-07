@@ -5,14 +5,13 @@ const { Option } = Select;
 
 const AddPackerForm = () => {
     const [form] = Form.useForm();
-    const [wells, setWells] = useState([]); // Для хранения списка скважин без пакеров
+    const [wells, setWells] = useState([]); 
     const [loading, setLoading] = useState(false);
 
-    // Загрузка списка скважин без пакеров при монтировании компонента
     useEffect(() => {
         const fetchWells = async () => {
             try {
-                const response = await fetch("/api/well/add/wellWithoutPacker"); // Новый эндпоинт
+                const response = await fetch("/api/well/add/wellWithoutPacker");
                 if (!response.ok) {
                     throw new Error("Не удалось загрузить список скважин");
                 }
@@ -44,7 +43,7 @@ const AddPackerForm = () => {
             const result = await response.json();
             message.success(result.message);
             form.resetFields();
-            window.location.reload();// Очистка формы после успешной отправки
+            window.location.reload();
         } catch (error) {
             message.error(error.message);
         } finally {

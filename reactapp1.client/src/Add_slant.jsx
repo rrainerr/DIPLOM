@@ -15,7 +15,7 @@ const AddWellSlantForm = () => {
     useEffect(() => {
         const fetchWells = async () => {
             try {
-                const response = await fetch("/api/well/list"); // Новый эндпоинт
+                const response = await fetch("/api/well/list"); 
                 if (!response.ok) {
                     throw new Error("Не удалось загрузить список скважин");
                 }
@@ -28,7 +28,6 @@ const AddWellSlantForm = () => {
         fetchWells();
     }, []);
 
-    // Обработка изменения глубины
     const handleDepthChange = (e) => {
         const depth = parseFloat(e.target.value);
         if (isNaN(depth) || depth <= 0) {
@@ -41,7 +40,7 @@ const AddWellSlantForm = () => {
         setShowTable(true);
     };
 
-    // Генерация таблицы с интервалами по 20 метров
+
     const generateSlantTable = (depth) => {
         const rows = [];
         const interval = 20;
@@ -63,7 +62,6 @@ const AddWellSlantForm = () => {
         setSlantData(rows);
     };
 
-    // Обработка изменения данных в таблице
     const handleTableChange = (index, field, value) => {
         const newData = [...slantData];
         newData[index] = {
@@ -73,7 +71,6 @@ const AddWellSlantForm = () => {
         setSlantData(newData);
     };
 
-    // Обработка отправки формы
     const onFinish = async (values) => {
         if (slantData.length === 0) {
             message.error("Пожалуйста, укажите глубину и сгенерируйте таблицу");
@@ -82,7 +79,7 @@ const AddWellSlantForm = () => {
 
         setLoading(true);
         try {
-            // Подготовка данных для отправки
+         
             const payload = slantData.map(item => ({
                 IdWell: values.IdWell,
                 Height: item.height,
@@ -90,7 +87,6 @@ const AddWellSlantForm = () => {
                 Azimuth: item.azimuth
             }));
 
-            // Отправка данных на сервер
             const response = await fetch("/api/well/wellslant", {
                 method: "POST",
                 headers: {

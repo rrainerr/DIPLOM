@@ -34,7 +34,7 @@ const ChartsModule = ({
                 height: '350'
             },
             title: {
-                text: 'История и прогноз добычи',
+                text: 'История и прогноз приемистости',
                 style: {
                     fontSize: '16px',
                     fontWeight: 'bold',
@@ -47,7 +47,7 @@ const ChartsModule = ({
                 crosshair: true
             },
             yAxis: {
-                title: { text: 'Дебит (м³/сут)' },
+                title: { text: 'Приемистость (м³/сут)' },
                 min: 0
             },
             tooltip: {
@@ -104,7 +104,7 @@ const ChartsModule = ({
 
         const series = [
             {
-                name: 'Фактический дебит',
+                name: 'Фактическая приемистость',
                 data: historicalData,
                 color: '#1890ff',
                 zIndex: 1,
@@ -113,7 +113,7 @@ const ChartsModule = ({
                 }
             },
             {
-                name: 'Прогноз дебита',
+                name: 'Прогноз приемистости',
                 data: forecastedData,
                 color: '#52c41a',
                 dashStyle: 'Dash',
@@ -175,7 +175,6 @@ const Mapp = () => {
     const user = JSON.parse(sessionStorage.getItem('user'));
     const isGeologist = user?.roleName === 'Геолог';
 
-    // Загрузка данных CRM
     const fetchCrmData = async (producerId) => {
         setLoadingCrm(true);
         try {
@@ -183,7 +182,7 @@ const Mapp = () => {
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
             const data = await response.json();
-            console.log('CRM Data Response:', data);
+            console.log('Данные:', data);
 
             const formattedData = {
                 ...data,
@@ -198,7 +197,7 @@ const Mapp = () => {
                 setUsedDefaults(data.appliedDefaults);
             }
         } catch (error) {
-            console.error('Error loading CRM data:', error);
+            console.error('Не удалось загрузить:', error);
             message.error('Не удалось загрузить данные о дебитах');
         } finally {
             setLoadingCrm(false);
@@ -215,7 +214,7 @@ const Mapp = () => {
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
             const data = await response.json();
-            console.log('Slant Data Response:', data);
+            console.log('Данные:', data);
 
             let formattedData = [];
             if (Array.isArray(data)) {
@@ -235,7 +234,7 @@ const Mapp = () => {
                 key: item.idWellSlant || `${wellId}-${item.height}-${Math.random().toString(36).substr(2, 9)}`
             })));
         } catch (error) {
-            console.error('Error loading slant data:', error);
+            console.error('Не удалось загрузить:', error);
             message.error('Не удалось загрузить данные о кривизне');
             setSlantData(null);
         } finally {
@@ -243,15 +242,13 @@ const Mapp = () => {
         }
     };
 
-
-    // Загрузка данных о связанных скважинах
     const fetchLinkedWells = async (wellId) => {
         try {
             const response = await fetch(`/api/map/linkNag?wellId=${wellId}`);
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
             const data = await response.json();
-            console.log('Linked Wells Response:', data);
+            console.log('Данные связей:', data);
 
             if (data.appliedDefaults) {
                 setUsedDefaults(prev => [...prev, ...(data.appliedDefaults.$values || data.appliedDefaults || [])]);
@@ -260,31 +257,28 @@ const Mapp = () => {
             const linkedWellsData = data.$values || data;
 
             if (!Array.isArray(linkedWellsData)) {
-                throw new Error('Expected data to be an array');
+                throw new Error('Не удалось загрузить');
             }
 
             setLinkedWells(linkedWellsData);
         } catch (error) {
-            console.error('Error loading linked wells:', error);
+            console.error('Не удалось загрузить:', error);
         }
     };
 
 
-
-
-    // Загрузка данных о точках и обновление карты
     const loadMapData = async () => {
         try {
             const response = await fetch('/api/well/map/point');
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
             const data = await response.json();
-            console.log('API Response:', data);
+            console.log('АПИ:', data);
 
             const pointsData = data.$values || data;
 
             if (!Array.isArray(pointsData)) {
-                throw new Error('Expected data to be an array');
+                throw new Error('Не удалось загрузить');
             }
 
             const newFeatures = [];
@@ -433,7 +427,6 @@ const Mapp = () => {
         }
     };
 
-    // Инициализация карты
     useEffect(() => {
         const params = new URLSearchParams(location.search);
         const wellId = params.get('wellId');
@@ -487,7 +480,7 @@ const Mapp = () => {
                 const pointData = clickedFeatures[0].get('info');
 
                 if (!pointData || !pointData.idWell) {
-                    console.warn('Invalid pointData:', pointData);
+                    console.warn('Не удалось загрузить:', pointData);
                     return;
                 }
 
@@ -518,14 +511,13 @@ const Mapp = () => {
         }
     }, [location]);
 
-    // Обновление карта при изменении данных
     useEffect(() => {
         if (mapInstance.current) {
             loadMapData();
         }
     }, [linkedWells, selectedPoint]);
 
-    // Загрузка данных о горизонтах
+
     const handleShowHorizonTable = async (wellId) => {
         setLoadingHorizonData(true);
         setIsHorizonModalVisible(true);
@@ -535,7 +527,7 @@ const Mapp = () => {
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
             const data = await response.json();
-            console.log('Horizon Data Response:', data);
+            console.log('Данные палстов:', data);
 
             const formattedData = data.horizonts.$values.map(item => ({
                 ...item,
@@ -546,16 +538,12 @@ const Mapp = () => {
 
             setHorizonData(formattedData);
         } catch (error) {
-            console.error('Error loading horizon data:', error);
+            console.error('Не удалось загрузить:', error);
         } finally {
             setLoadingHorizonData(false);
         }
     };
 
-    // Настройки для Highcharts (круговая диаграмма)
-   
-
-    // Столбцы для таблицы
     const columns = [
         {
             title: '№Скважины',

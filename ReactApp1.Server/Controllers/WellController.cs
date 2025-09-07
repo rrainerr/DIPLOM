@@ -17,12 +17,11 @@ public class wellController : ControllerBase
         _context = context;
     }
 
-    // Получение списка скважин без пакеров
     [HttpGet("add/wellWithoutPacker")]
     public async Task<ActionResult<IEnumerable<Well>>> GetWellsWithoutPackers()
     {
         var wellsWithoutPackers = await _context.Wells
-            .Where(w => !_context.Packers.Any(p => p.IdWell == w.IdWell)) // Скважины без пакеров
+            .Where(w => !_context.Packers.Any(p => p.IdWell == w.IdWell))
             .ToListAsync();
 
         if (wellsWithoutPackers == null || !wellsWithoutPackers.Any())
@@ -80,7 +79,7 @@ public class wellController : ControllerBase
 
         return Ok(slantData);
     }
-    // Получение списка скважин
+
     [HttpGet("add")]
     public async Task<ActionResult<IEnumerable<Well>>> GetWells()
     {
@@ -94,7 +93,7 @@ public class wellController : ControllerBase
         return Ok(wells);
 
     }
-    // Метод для получения данных скважин с фильтрацией
+
     [HttpGet("table")]
     public async Task<ActionResult> GetWells(
   [FromQuery] int page = 1,
@@ -223,18 +222,35 @@ public class wellController : ControllerBase
         var newWell = new Well
         {
             Name = request.Name,
-            Longitude = SimpleAES.Encrypt(request.Longitude),
-            Latitude = SimpleAES.Encrypt(request.Latitude),
+            Longitude = SimpleAES.Encrypt(request.Longitude ?? 0),
+            Latitude = SimpleAES.Encrypt(request.Latitude ?? 0),
             IdWorkshop = request.IdWorkshop ?? 0,
-            IdType = request.IdType,
-            DrainageRadius = request.DrainageRadius,
-            WellRadius = request.WellRadius,
+            IdType = request.IdType ?? 0,
+            DrainageRadius = request.DrainageRadius ?? 0,
+            WellRadius = request.WellRadius ?? 0,
         };
 
         _context.Wells.Add(newWell);
         await _context.SaveChangesAsync();
 
-        if (request.WellLink.HasValue)
+        if (request.IdType == 1 && request.WellLinks != null && request.WellLinks.Any())
+        {
+            foreach (var wellLinkId in request.WellLinks)
+            {
+                var link = new Link
+                {
+                    IdWell = newWell.IdWell,
+                    WellLink = wellLinkId, 
+                    Lastratio = 0,
+                    Status = 1,
+                };
+
+                _context.Links.Add(link);
+            }
+            await _context.SaveChangesAsync();
+        }
+
+        else if (request.WellLink.HasValue)
         {
             var link = new Link
             {
@@ -250,6 +266,9 @@ public class wellController : ControllerBase
 
         return CreatedAtAction(nameof(GetWells), new { id = newWell.IdWell }, newWell);
     }
+
+
+
 
     [HttpGet("map/point")]
     public async Task<ActionResult<IEnumerable<object>>> GetWellsMap()
@@ -306,6 +325,7 @@ public class wellController : ControllerBase
         public double? WellRadius { get; set; }
         public int? WellLink { get; set; }
         public long? LinkedWellId { get; set; }
+        public List<int> WellLinks { get; set; } = new List<int>();
         public List<long>? LinkedWellIds { get; set; }
         public List<LinkedPointRequest>? LinkedPoints { get; set; }
     }

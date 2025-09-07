@@ -14,15 +14,13 @@ public class ngduController : ControllerBase
         _context = context;
     }
 
-
-    // Получение списка НГДУ
     [HttpGet("add")]
     public async Task<IActionResult> GetNgdus()
     {
         var ngdus = await _context.Ngdus.ToListAsync();
         return Ok(ngdus);
     }
-    // Метод для получения списка НГДУ
+
     [HttpGet("table")]
     public async Task<ActionResult> GetNgduList()
     {
@@ -34,9 +32,9 @@ public class ngduController : ControllerBase
             })
             .ToListAsync();
 
-        return Ok(ngduList); // Возвращаем массив без $id и $values
+        return Ok(ngduList); 
     }
-    // Добавление нового НГДУ
+
     [HttpPost("add/ngdu")]
     public async Task<IActionResult> AddNgdu([FromBody] Ngdu ngdu)
     {
@@ -52,14 +50,13 @@ public class ngduController : ControllerBase
     }
 
 
-    // Редактирование НГДУ
     [HttpPut("add/{id}")]
     public async Task<IActionResult> UpdateNgdu(long id, [FromBody] Ngdu ngdu)
     {
         try
         {
-            Console.WriteLine($"Received ID: {id}, Type: {id.GetType()}"); // Логируем ID и его тип
-            Console.WriteLine($"Received data: {JsonSerializer.Serialize(ngdu)}"); // Логируем данные
+            Console.WriteLine($"Received ID: {id}, Type: {id.GetType()}"); 
+            Console.WriteLine($"Received data: {JsonSerializer.Serialize(ngdu)}"); 
 
             if (ngdu == null || id != ngdu.IdNgdu)
             {
@@ -72,7 +69,7 @@ public class ngduController : ControllerBase
                 return NotFound("Ngdu not found.");
             }
 
-            // Обновляем данные
+
             existingNgdu.Name = ngdu.Name;
 
             _context.Ngdus.Update(existingNgdu);
@@ -88,7 +85,7 @@ public class ngduController : ControllerBase
         }
     }
 
-    // Удаление НГДУ
+
     [HttpDelete("add/{id}")]
     public async Task<IActionResult> DeleteNgdu(long id)
     {
@@ -96,7 +93,7 @@ public class ngduController : ControllerBase
         {
             // Находим Ngdu по id
             var ngdu = await _context.Ngdus
-                .Include(n => n.Workshops) // Включаем связанные Workshop
+                .Include(n => n.Workshops) 
                 .FirstOrDefaultAsync(n => n.IdNgdu == id);
 
             if (ngdu == null)
@@ -104,16 +101,13 @@ public class ngduController : ControllerBase
                 return NotFound("Ngdu not found.");
             }
 
-            // Устанавливаем IdNgdu в null для всех связанных Workshop
             foreach (var workshop in ngdu.Workshops)
             {
                 workshop.IdNgdu = null;
             }
 
-            // Удаляем Ngdu
             _context.Ngdus.Remove(ngdu);
 
-            // Сохраняем изменения в базе данных
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Ngdu deleted successfully.", ngduId = id });

@@ -19,7 +19,6 @@ const Mapp = () => {
     const location = useLocation();
     const user = JSON.parse(sessionStorage.getItem('user'));
 
-    // Функция для получения маршрута между двумя точками с использованием OSRM
     const getRoute = async (start, end) => {
         try {
             const response = await fetch(
@@ -34,7 +33,6 @@ const Mapp = () => {
         }
     };
 
-    // Функция для добавления маршрута на карту
     const addRouteToMap = (coordinates) => {
         const routeFeature = new Feature({
             geometry: new LineString(coordinates),
@@ -51,28 +49,26 @@ const Mapp = () => {
         vectorSourceRef.current.addFeature(routeFeature);
     };
 
-    // Загрузка данных о связанных скважинах
     const fetchLinkedWells = async (wellId) => {
         try {
             const response = await fetch('/api/well/map/point');
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
             const data = await response.json();
-            console.log('Linked Wells Response:', data);
+            console.log('Данные связей:', data);
 
             const linkedWellsData = data.$values || data;
 
             if (!Array.isArray(linkedWellsData)) {
-                throw new Error('Expected data to be an array');
+                throw new Error('Не удалось загрузить');
             }
 
             setLinkedWells(linkedWellsData);
         } catch (error) {
-            console.error('Error loading linked wells:', error);
+            console.error('Не удалось загрузить:', error);
         }
     };
 
-    // Загрузка данных о точках и построение маршрутов
     useEffect(() => {
         const loadData = async () => {
             try {
@@ -80,17 +76,16 @@ const Mapp = () => {
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
                 const data = await response.json();
-                console.log('API Response:', data);
+                console.log('АПИ:', data);
 
                 const pointsData = data.$values || data;
 
                 if (!Array.isArray(pointsData)) {
-                    throw new Error('Expected data to be an array');
+                    throw new Error('Не удалось загрузить');
                 }
 
                 const newFeatures = [];
 
-                // Добавление точек на карту
                 pointsData.forEach((point) => {
                     const coords = fromLonLat([point.longitude, point.latitude]);
                     const feature = new Feature({
@@ -124,8 +119,6 @@ const Mapp = () => {
                     });
 
                     newFeatures.push(feature);
-
-                    // Построение маршрутов между связанными точками
                     if (point.links && point.links.$values && Array.isArray(point.links.$values)) {
                         point.links.$values.forEach(async (link) => {
                             const linkedWell = pointsData.find((w) => w.idWell === link.wellLink);
@@ -143,14 +136,13 @@ const Mapp = () => {
                 vectorSourceRef.current.clear();
                 vectorSourceRef.current.addFeatures(newFeatures);
             } catch (error) {
-                console.error('Error loading points:', error);
+                console.error('Не удалось загрузить:', error);
             }
         };
 
         loadData();
     }, []);
 
-    // Инициализация карты
     useEffect(() => {
         const params = new URLSearchParams(location.search);
         const wellId = params.get('wellId');
@@ -187,7 +179,7 @@ const Mapp = () => {
                 const pointData = clickedFeatures[0].get('info');
 
                 if (!pointData || !pointData.idWell) {
-                    console.warn('Invalid pointData:', pointData);
+                    console.warn('Не удалось загрузить:', pointData);
                     return;
                 }
 
@@ -223,12 +215,7 @@ const Mapp = () => {
                                 marginTop: '10px',
                             }}
                         />
-              
-
-
-    
-
-               
+ 
             </Content>
         </Layout>
     );

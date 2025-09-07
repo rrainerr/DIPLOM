@@ -36,11 +36,8 @@ namespace ReactApp1.Server.Controllers
                 _logger.LogWarning("Попытка входа с неверными данными: {Email}", model.Email);
                 return Unauthorized(new { message = "Неверный email или пароль" });
             }
-
-            // Проверка, хеширован ли пароль
             if (!user.Password.StartsWith("$2b$"))
             {
-                // Если пароль не хеширован, проверяем его как текст, хешируем и обновляем в базе
                 if (user.Password == model.Password)
                 {
                     user.Password = BCrypt.Net.BCrypt.HashPassword(model.Password);
@@ -59,7 +56,7 @@ namespace ReactApp1.Server.Controllers
                 return Unauthorized(new { message = "Неверный email или пароль" });
             }
             user = await _context.Users
-            .Include(u => u.IdRoleNavigation) // Загружаем связанную роль
+            .Include(u => u.IdRoleNavigation) 
             .FirstOrDefaultAsync(u => u.Email == model.Email);
             _logger.LogInformation("Пользователь {Email} успешно авторизован.", user.Email);
             return Ok(new
@@ -71,7 +68,7 @@ namespace ReactApp1.Server.Controllers
                     user.FirstName,
                     user.Surname,
                     user.Email,
-                    RoleName = user.IdRoleNavigation.Name // Добавляем название роли
+                    RoleName = user.IdRoleNavigation.Name 
                 }
             });
         }

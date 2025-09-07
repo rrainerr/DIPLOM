@@ -18,19 +18,17 @@ import Add_slant from './Add_slant';
 import Maping from './Maping';
 import './App.css';
 import SidebarComponent from './SidebarComponent';
-import ruRU from "antd/lib/locale/ru_RU"; // Для русского языка
+import ruRU from "antd/lib/locale/ru_RU";
 const { Content } = Layout;
 
 function App() {
     const [collapsed, setCollapsed] = useState(() => {
-        // Загружаем состояние из localStorage при инициализации
         const savedCollapsed = localStorage.getItem('collapsed') === 'true';
         return savedCollapsed;
     });
     const navigate = useNavigate();
-    const user = JSON.parse(sessionStorage.getItem('user')); // Получаем данные пользователя
+    const user = JSON.parse(sessionStorage.getItem('user'));
 
-    // Если пользователь не авторизован, перенаправляем на страницу авторизации
     useEffect(() => {
         if (!user) {
             navigate('/AuthForm');

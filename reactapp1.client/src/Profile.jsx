@@ -306,17 +306,14 @@ const ProfilePage = () => {
 
 
     const handleDelete = async (id) => {
-        // 1. Временный лог для проверки
-        console.log('Delete initiated', { id, modalType });
+        console.log('Удалено ', { id, modalType });
 
-        // 2. Упрощенное подтверждение (если Modal.confirm не работает)
         if (!window.confirm('Вы уверены, что хотите удалить этот элемент?')) {
             console.log('Удаление отменено');
             return;
         }
 
         try {
-            // 3. Определяем endpoint
             const endpointMap = {
                 field: `/api/field/${id}`,
                 ngdu: `/api/ngdu/add/${id}`,
@@ -326,9 +323,8 @@ const ProfilePage = () => {
             const endpoint = endpointMap[modalType];
             if (!endpoint) throw new Error('Неизвестный тип данных');
 
-            console.log('Sending DELETE to:', endpoint);
 
-            // 4. Отправляем запрос
+
             const response = await fetch(endpoint, {
                 method: 'DELETE',
                 headers: {
@@ -337,18 +333,13 @@ const ProfilePage = () => {
                 }
             });
 
-            console.log('Response received:', {
-                status: response.status,
-                statusText: response.statusText
-            });
 
-            // 5. Обрабатываем ответ
+
             if (!response.ok) {
                 const errorText = await response.text();
                 throw new Error(errorText || 'Ошибка сервера');
             }
 
-            // 6. Обновляем состояние
             const filterKeyMap = {
                 field: 'idField',
                 ngdu: 'idNgdu',

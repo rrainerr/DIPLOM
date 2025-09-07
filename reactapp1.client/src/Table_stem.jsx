@@ -14,7 +14,6 @@ const HorizonTable = () => {
     const [pageSize, setPageSize] = useState(10);
     const navigate = useNavigate();
 
-    // Загрузка данных для таблицы
     const fetchData = async (page, pageSize) => {
         setLoading(true);
         try {
@@ -30,12 +29,10 @@ const HorizonTable = () => {
             const result = JSON.parse(rawResponse);
             console.log("Ответ от API:", result);
 
-            // Проверяем наличие данных в правильной структуре
             if (!result || !result.stems || !result.stems.$values || !Array.isArray(result.stems.$values)) {
                 throw new Error("Некорректный формат данных от API");
             }
 
-            // Форматируем данные
             const formattedData = result.stems.$values.map(item => ({
                 ...item,
                 key: item.idStem ? item.idStem.toString() : `${Math.random()}`,
@@ -58,7 +55,6 @@ const HorizonTable = () => {
         fetchData(page, pageSize);
     }, [page, pageSize]);
 
-    // Колонки таблицы
     const columns = [
         {
             title: "№ Скважины",
@@ -84,9 +80,7 @@ const HorizonTable = () => {
             ),
         },
         { title: "Глубина", dataIndex: "depth", key: "depth" },
-       
-        
-        // Добавьте другие колонки по необходимости
+
     ];
 
     return (

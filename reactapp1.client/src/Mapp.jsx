@@ -36,7 +36,7 @@ const Mapp = () => {
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
             const data = await response.json();
-            console.log('Linked Wells Response:', data);
+            console.log('Данные связей:', data);
 
             if (data.appliedDefaults) {
                 setUsedDefaults(data.appliedDefaults);
@@ -44,12 +44,12 @@ const Mapp = () => {
 
             const linkedWellsData = data.$values || data;
             if (!Array.isArray(linkedWellsData)) {
-                throw new Error('Expected data to be an array');
+                throw new Error('Не удалось загрузить');
             }
 
             setLinkedWells(linkedWellsData);
         } catch (error) {
-            console.error('Error loading linked wells:', error);
+            console.error('Не удалось загрузить:', error);
         }
     };
 
@@ -58,7 +58,7 @@ const Mapp = () => {
         setLoadingCrm(true);
         try {
             const response = await fetch(`/api/CrmCalculator/production/${producerId}`);
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            if (!response.ok) throw new Error(`Не удалось загрузить: ${response.status}`);
 
             const data = await response.json();
             const formattedData = {
@@ -79,7 +79,7 @@ const Mapp = () => {
                 setUsedDefaults([]);
             }
         } catch (error) {
-            console.error('Error loading CRM data:', error);
+            console.error('Не удалось загрузить:', error);
             message.error('Не удалось загрузить данные CRM');
         } finally {
             setLoadingCrm(false);
@@ -195,7 +195,7 @@ const Mapp = () => {
                 IdWell: well.idWell,
             }));
 
-            console.log("Sending data:", updates);
+            console.log("Данные обновления:", updates);
 
             const response = await fetch('/api/map/addMultiple', {
                 method: 'POST',
@@ -206,20 +206,20 @@ const Mapp = () => {
             });
 
             const responseText = await response.text();
-            console.log('Raw response:', responseText);
+            console.log('Данные:', responseText);
 
             if (!response.ok) {
-                console.error('Server error:', responseText);
+                console.error('Не удалось загрузить:', responseText);
                 throw new Error(responseText || 'Ошибка при сохранении Ratio');
             }
 
             let responseData;
             try {
                 responseData = JSON.parse(responseText);
-                console.log('Response data:', responseData);
+                console.log('Данные:', responseData);
             } catch (jsonError) {
-                console.error('Failed to parse JSON:', jsonError);
-                throw new Error('Invalid JSON response from server');
+                console.error('Не удалось загрузить:', jsonError);
+                throw new Error('Не удалось загрузить');
             }
 
             const updatedLinkedWells = linkedWells.map((well) => ({
@@ -232,47 +232,11 @@ const Mapp = () => {
             setIsRatioModalVisible(false);
             window.location.reload();
         } catch (error) {
-            console.error('Error saving ratios:', error);
+            console.error('Не удалось загрузить:', error);
             message.error(error.message || 'Ошибка при сохранении Ratio');
         }
     };
-    const handleShowSlantTable = async (wellId) => {
-        setLoadingSlantData(true);
-        setIsSlantModalVisible(true);
-        setSlantData([]);
-
-        try {
-            const response = await fetch(`/api/well/wellslant/table?wellId=${wellId}`);
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-            const data = await response.json();
-            console.log('Slant Data Response:', data);
-
-            let formattedData = [];
-            if (Array.isArray(data)) {
-                formattedData = data;
-            } else if (data && typeof data === 'object') {
-                formattedData = data.$values || [];
-            }
-
-            const validatedData = formattedData.filter(item =>
-                item.height !== undefined &&
-                item.slant !== undefined &&
-                item.azimuth !== undefined
-            );
-
-            setSlantData(validatedData.map(item => ({
-                ...item,
-                key: item.idWellSlant || `${wellId}-${item.height}-${Math.random().toString(36).substr(2, 9)}`
-            })));
-        } catch (error) {
-            console.error('Error loading slant data:', error);
-            message.error('Не удалось загрузить данные о кривизне');
-            setSlantData(null);
-        } finally {
-            setLoadingSlantData(false);
-        }
-    };
+   
     useEffect(() => {
         const params = new URLSearchParams(location.search);
         const wellId = params.get('wellId');
@@ -330,7 +294,6 @@ const Mapp = () => {
                         />
                         <MapModule
                             onShowHorizonTable={() => { }}
-                            onShowSlantTable={handleShowSlantTable}
                             linkedWells={linkedWells}
                             style={{ marginTop: 20 }}
                         />
@@ -338,10 +301,6 @@ const Mapp = () => {
                     </Col>
 
                 </Row>
-
-               
-
-                {/* Модальные окна */}
           
                 <Modal
                     title="Изменить КВ"
@@ -361,7 +320,6 @@ const Mapp = () => {
                                 <Button
                                     type="dashed"
                                     size="small"
-                                    icon={<InfoCircleOutlined />}
                                     onClick={() => setDefaultsModalVisible(true)}
                                 >
                                     Подробнее о данных

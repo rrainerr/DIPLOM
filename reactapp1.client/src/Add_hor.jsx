@@ -8,11 +8,10 @@ const { Title } = Typography;
 const AddHorizontForm = () => {
     const [form] = Form.useForm();
     const navigate = useNavigate();
-    const [fields, setFields] = useState([]); // Для хранения списка полей (Field)
+    const [fields, setFields] = useState([]); 
     const [loading, setLoading] = useState(false);
-    const [wells, setWells] = useState([]);  // For wells data
+    const [wells, setWells] = useState([]); 
 
-    // Загрузка списка полей (Field) при монтировании компонента
     useEffect(() => {
         const fetchFields = async () => {
             try {
@@ -28,7 +27,7 @@ const AddHorizontForm = () => {
                 }
 
                 const data = await response.json();
-                setFields(data.$values); // Используем data.$values для доступа к массиву полей
+                setFields(data.$values);
             } catch (error) {
                 message.error(error.message);
             }
@@ -50,7 +49,7 @@ const AddHorizontForm = () => {
                 }
 
                 const data = await response.json();
-                setWells(data.$values); // Store wells data in the wells state
+                setWells(data.$values);
             } catch (error) {
                 message.error(error.message);
             }
@@ -77,8 +76,8 @@ const AddHorizontForm = () => {
 
             const result = await response.json();
             message.success(result.message);
-            form.resetFields(); // Очистка формы после успешной отправки
-            navigate("/Table_hor"); // Перенаправление на страницу со списком пластов
+            form.resetFields(); 
+            navigate("/Table_hor");
         } catch (error) {
             message.error(error.message);
         } finally {
@@ -141,12 +140,15 @@ const AddHorizontForm = () => {
                 <Form.Item label="Пористость, д.ед." name="Porosity">
                     <Input type="number" />
                 </Form.Item>
+
                 <Form.Item label="Толщина, м" name="Thickness">
                     <Input type="number" />
                 </Form.Item>
+
                 <Form.Item label="Вязкость флюида, сПз" name="Viscosity">
                     <Input type="number" />
                 </Form.Item>
+
                 <Form.Item label="Проницаемость, мД" name="Permeability">
                     <Input type="number" />
                 </Form.Item>

@@ -4,7 +4,7 @@ import { fromLonLat, toLonLat } from 'ol/proj';
 import { Tile as TileLayer } from 'ol/layer';
 import { OSM } from 'ol/source';
 import 'ol/ol.css';
-import { Form, Input, Button, Select, message, Typography, notification } from 'antd';
+import { Form, Input, Button, Select, message, Typography, notification, Checkbox } from 'antd';
 
 const { Title } = Typography;
 
@@ -52,6 +52,7 @@ const Mapp = () => {
     const [types, setTypes] = useState([]);
     const [wells, setWells] = useState([]);
     const [selectedType, setSelectedType] = useState(null);
+    const [selectedWells, setSelectedWells] = useState([]);
     const [form] = Form.useForm();
     const [api, contextHolder] = notification.useNotification();
 
@@ -127,9 +128,12 @@ const Mapp = () => {
 
     const handleTypeChange = (value) => {
         setSelectedType(value);
-        if (value !== 1) {
-            form.setFieldsValue({ well: undefined });
-        }
+        setSelectedWells([]);
+        form.setFieldsValue({ wells: [] });
+    };
+
+    const handleWellSelectionChange = (values) => {
+        setSelectedWells(values);
     };
 
     const handleNext = (values) => {
@@ -165,12 +169,13 @@ const Mapp = () => {
             latitude: selectedCoords[1],
             idWorkshop: formData.workshop || 0,
             idType: selectedType || null,
-            idWell: formData.well || null,
-            wellLink: formData.well || null,
+            wellLinks: selectedType === 1 ? selectedWells.map(id => parseInt(id)) : [],
+            wellLink: null
         };
 
+        console.log('Отправляемые данные:', JSON.stringify(requestBody, null, 2));
+
         try {
-            // Показываем уведомление о загрузке
             const hideLoading = message.loading('Сохранение точки...', 0);
 
             const response = await fetch('/api/well/map/add', {
@@ -189,13 +194,12 @@ const Mapp = () => {
             const newPoint = await response.json();
             console.log('Новая точка:', newPoint);
 
-            // Скрываем уведомление о загрузке и показываем успех
             hideLoading();
             showSuccessNotification();
 
-            // Сбрасываем форму
             setActiveStep(1);
             setSelectedCoords(null);
+            setSelectedWells([]);
             form.resetFields();
 
         } catch (error) {
@@ -208,6 +212,8 @@ const Mapp = () => {
             });
         }
     };
+
+    const productionWells = wells.filter(well => well.idType === 2);
 
     return (
         <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', flexDirection: 'column', alignItems: 'center', padding: '20px' }}>
@@ -255,17 +261,26 @@ const Mapp = () => {
                     <Form.Item name="drainageRadius" label="Радиус дренирования, м" rules={[{ required: true }]}>
                         <Input type="number" />
                     </Form.Item>
+
                     {selectedType === 1 && (
-                        <Form.Item name="well" label="Скважина" rules={[{ required: true }]}>
-                            <Select>
-                                {Array.isArray(wells) && wells.length > 0 ? (
-                                    wells.map((well) => (
+                        <Form.Item name="wells" label="Связанные добывающие скважины">
+                            <Select
+                                mode="multiple"
+                                placeholder="Выберите добывающие скважины"
+                                value={selectedWells}
+                                onChange={setSelectedWells}
+                                style={{ width: '100%' }}
+                            >
+                                {Array.isArray(productionWells) && productionWells.length > 0 ? (
+                                    productionWells.map((well) => (
                                         <Select.Option key={well.idWell} value={well.idWell}>
                                             {well.name}
                                         </Select.Option>
                                     ))
                                 ) : (
-                                    <Select.Option disabled>Нет данных</Select.Option>
+                                    <Select.Option disabled value="no-data">
+                                        Нет доступных добывающих скважин
+                                    </Select.Option>
                                 )}
                             </Select>
                         </Form.Item>

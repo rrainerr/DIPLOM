@@ -155,7 +155,6 @@ namespace ReactApp1.Server.Controllers
                 var forecastedTotals = new Dictionary<long, double>();
                 var allMissingData = new List<MissingDataRequest>();
 
-                // Применяем усреднённые значения для производителя
                 var prodHorizont = producer.Horizonts.FirstOrDefault(h => h.SostPl == 1 || h.SostPl == 3);
                 if (prodHorizont == null)
                     return BadRequest("Не найден продуктивный горизонт");
@@ -172,7 +171,6 @@ namespace ReactApp1.Server.Controllers
                     IsProducer = true
                 }));
 
-                // Словарь для связи параметров с нагнетательными скважинами
                 var injectorInfo = new Dictionary<long, (string Name, long IdWell)>();
 
                 foreach (var link in activeLinks)
@@ -184,7 +182,6 @@ namespace ReactApp1.Server.Controllers
                     if (injector == null)
                         continue;
 
-                    // Сохраняем информацию о нагнетательной скважине с проверкой на null
                     injectorInfo[link.IdLink] = (injector.Name ?? "Неизвестно", injector.IdWell);
 
                     var injHorizont = injector.Horizonts.FirstOrDefault(h => h.SostPl == 1 || h.SostPl == 3);
@@ -205,7 +202,6 @@ namespace ReactApp1.Server.Controllers
                     }));
                 }
 
-                // Расчет CRM коэффициентов
                 foreach (var link in activeLinks)
                 {
                     var injector = _db.Wells
@@ -229,7 +225,11 @@ namespace ReactApp1.Server.Controllers
                        injector, 
                         link, prodHorizont, injHorizont, producerRate, injectorRate);
 
-                    
+                    if (link.Lastratio.HasValue && link.Lastratio > 0)
+                    {
+                        crmRatio = 0.75 * crmRatio + 0.15 * link.Lastratio.Value;
+                    }
+
 
                     var historicalData = _db.Measurings
                         .Where(m => m.IdLink == link.IdLink)
@@ -259,7 +259,6 @@ namespace ReactApp1.Server.Controllers
                 NormalizeRatios(results, injectorTotals, activeLinks);
                 NormalizeForecastedRatios(results, forecastedTotals, activeLinks);
 
-                // Формируем AppliedDefaults
                 var appliedDefaults = allMissingData.Select(m => new AppliedDefaultValue
                 {
                     Parameter = m.ParameterName,
@@ -287,7 +286,6 @@ namespace ReactApp1.Server.Controllers
         {
             try
             {
-                // Получаем рассчитанные CRM коэффициенты
                 var ratiosResponse = await CalculateCrmRatiosAsync(producerId);
 
                 if (ratiosResponse.Result is not OkObjectResult okResult ||
@@ -299,7 +297,7 @@ namespace ReactApp1.Server.Controllers
                    .Where(w => w.IdWell == producerId)
                    .OrderBy(w => w.Year)
                    .ThenBy(w => w.Month)
-                   .Take(24) // Последние 2 года
+                   .Take(24) 
                    .Select(w => new HistoricalProduction
                    {
                        Date = new DateTime((int)(w.Year ?? DateTime.Now.Year),
@@ -311,9 +309,9 @@ namespace ReactApp1.Server.Controllers
                 var ratios = crmResponse.Results;
 
                 var lastHistoryDate = productionHistory1.Max(h => h.Date);
-                // Вычисляем количество месяцев между последней датой и текущей датой
+     
                 var monthsToForecast = (DateTime.Now.Year - lastHistoryDate.Year) * 12 + DateTime.Now.Month - lastHistoryDate.Month;
-                // Генерируем прогноз на вычисленное количество месяцев
+
                 var forecast = GenerateProductionForecast(productionHistory1, Math.Max(monthsToForecast, 1));
 
                 var producer = _db.Wells
@@ -321,14 +319,13 @@ namespace ReactApp1.Server.Controllers
                     .FirstOrDefault(w => w.IdWell == producerId);
                 if (producer == null) return NotFound("Скважина не найдена");
 
-                // Получаем последние данные по добывающей скважине
+
                 var currentProductionData = _db.WellData
                     .Where(w => w.IdWell == producerId)
                     .OrderByDescending(w => w.Year)
                     .ThenByDescending(w => w.Month)
                     .FirstOrDefault();
 
-                // Получаем текущие данные по нагнетательным скважинам
                 var injectorIds = ratios.Select(r => r.InjectorId.Value).ToList();
                 var currentInjectionData = _db.Wells
                     .Where(w => injectorIds.Contains(w.IdWell))
@@ -345,7 +342,7 @@ namespace ReactApp1.Server.Controllers
                         x => x.CurrentInjection?.Rate ?? 0
                     );
 
-                // Получаем исторические данные для расчетов
+
                 var productionHistory = _db.WellData
                     .Where(w => w.IdWell == producerId)
                     .OrderByDescending(w => w.Year)
@@ -365,11 +362,10 @@ namespace ReactApp1.Server.Controllers
                               .ToList()
                     );
 
-                // Рассчитываем параметры CRM
+
                 double tau = CalculateTauParameter(producer);
                 var crmRatios = ratios.ToDictionary(r => r.InjectorId.Value, r => r.CalculatedRatio);
 
-                // Расчет дебита и приемистости
                 double productionRate = CalculateProductionRate(productionHistory, injectionHistory, crmRatios, tau);
 
                 var injectionRates = ratios.ToDictionary(
@@ -460,26 +456,26 @@ namespace ReactApp1.Server.Controllers
                     return 1.0;
                 }
                 ApplyAverageValues(producer, horizon);
-                // Параметры пласта
-                double permeability = horizon.Permeability ?? 0; // мД
-                double thickness = horizon.Thickness ?? 10; // м
-                double porosity = horizon.Porosity ?? 0.2; // доли единицы
-                double viscosity = horizon.Viscosity ?? 1; // сПз
-                double compressibility = horizon.Compressibility ?? 1e-5; // 1/атм
+
+                double permeability = horizon.Permeability ?? 0; 
+                double thickness = horizon.Thickness ?? 10;
+                double porosity = horizon.Porosity ?? 0.2; 
+                double viscosity = horizon.Viscosity ?? 1; 
+                double compressibility = horizon.Compressibility ?? 1e-5; 
 
                 // Параметры скважины
-                double drainageRadius = producer.DrainageRadius ?? 500; // м
-                double wellRadius = producer.WellRadius ?? 0.1; // м
+                double drainageRadius = producer.DrainageRadius ?? 500;
+                double wellRadius = producer.WellRadius ?? 0.1;
                 double skinFactor = producer.SkinFactors?
                     .OrderByDescending(s => s.Date)
                     .FirstOrDefault()?
                     .SkinFactor1 ?? 0;
 
-                // Расчет порового объема
+              
                 double drainageArea = Math.PI * Math.Pow(drainageRadius, 2);
                 double V = drainageArea * thickness * porosity;
 
-                // Расчет индекса продуктивности
+             
                 double J = CalculateProductivityIndex(
                     permeability,
                     thickness,
@@ -488,7 +484,6 @@ namespace ReactApp1.Server.Controllers
                     wellRadius,
                     skinFactor);
 
-                // Постоянная времени
                 double tau = (compressibility * V) / Math.Max(J, 0.001);
 
                 _logger.LogInformation($"Рассчитаны параметры для скв. {producer.IdWell}: V={V:F2} м³, J={J:F2}, τ={tau:F2} дней");
@@ -862,61 +857,56 @@ namespace ReactApp1.Server.Controllers
             {
                 try
                 {
-                    // Проверяем подключение к БД
+
                     if (!await _db.Database.CanConnectAsync())
                     {
                         _logger.LogWarning("Нет подключения к БД, используются значения по умолчанию");
                         return GetDefaultValues();
                     }
 
-                    // Создаем словарь для результатов
                     var averages = new Dictionary<string, double>();
 
-                    // Рассчитываем средние значения с дополнительными проверками
-
-                    // Пористость
                     averages["Porosity"] = await GetSafeAverageAsync(
                         _db.Horizonts.Where(h => h.Porosity != null),
                         h => h.Porosity,
                         0.15);
 
-                    // Толщина пласта
+            
                     averages["Thickness"] = await GetSafeAverageAsync(
                         _db.Horizonts.Where(h => h.Thickness != null),
                         h => h.Thickness,
                         10);
 
-                    // Вязкость
+                
                     averages["Viscosity"] = await GetSafeAverageAsync(
                         _db.Horizonts.Where(h => h.Viscosity != null),
                         h => h.Viscosity,
                         1);
 
-                    // Проницаемость
+             
                     averages["Permeability"] = await GetSafeAverageAsync(
                         _db.Horizonts.Where(h => h.Permeability != null),
                         h => h.Permeability,
                         100);
 
-                    // Сжимаемость
+                
                     averages["Compressibility"] = await GetSafeAverageAsync(
                         _db.Horizonts.Where(h => h.Compressibility != null),
                         h => h.Compressibility,
                         0.0005);
 
-                    // Радиус дренирования
+                    
                     averages["DrainageRadius"] = await GetSafeAverageAsync(
                         _db.Wells.Where(w => w.DrainageRadius != null),
                         w => w.DrainageRadius,
                         500);
 
-                    // Радиус скважины
+           
                     averages["WellRadius"] = await GetSafeAverageAsync(
                         _db.Wells.Where(w => w.WellRadius != null),
                         w => w.WellRadius,
                         0.1);
 
-                    // Скин-фактор
                     averages["SkinFactor"] = await GetSafeAverageAsync(
                         _db.SkinFactors.Where(s => s.SkinFactor1 != null),
                         s => s.SkinFactor1,
@@ -980,10 +970,10 @@ namespace ReactApp1.Server.Controllers
         public class ProductionResult
         {
             public int ProducerId { get; set; }
-            public double ProductionRate { get; set; }  // Расчетный дебит
-            public double CurrentProduction { get; set; }  // Текущий фактический дебит
-            public Dictionary<long, double> InjectionRates { get; set; }  // Расчетная приемистость
-            public Dictionary<long, double> CurrentInjectionRates { get; set; }  // Текущая фактическая приемистость
+            public double ProductionRate { get; set; }  
+            public double CurrentProduction { get; set; } 
+            public Dictionary<long, double> InjectionRates { get; set; } 
+            public Dictionary<long, double> CurrentInjectionRates { get; set; } 
             public double TimeConstant { get; set; }
             public Dictionary<long, double> ConnectivityFactors { get; set; }
             public List<AppliedDefaultValue> AppliedDefaults { get; set; }
@@ -995,7 +985,7 @@ namespace ReactApp1.Server.Controllers
         {
             public DateTime Date { get; set; }
             public double Value { get; set; }
-            public string Type { get; set; } // "actual" или "forecast"
+            public string Type { get; set; } 
         }
         public class RatioData
         {

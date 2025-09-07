@@ -13,7 +13,7 @@ public class stemController : ControllerBase
     {
         _context = context;
     }
-    // Получение списка всех стволов
+
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Stem>>> GetStems(
         [FromQuery] int page = 1,
@@ -22,17 +22,16 @@ public class stemController : ControllerBase
         [FromQuery] long? horizontId = null)
     {
         var query = _context.Stems
-            .Include(s => s.IdWellNavigation) // Включаем данные о скважине
-            .Include(s => s.IdHorizontNavigation) // Включаем данные о горизонте
+            .Include(s => s.IdWellNavigation) 
+            .Include(s => s.IdHorizontNavigation) 
             .AsQueryable();
 
-        // Применение фильтра по скважине
+
         if (wellId.HasValue)
         {
             query = query.Where(s => s.IdWell == wellId.Value);
         }
 
-        // Применение фильтра по горизонту
         if (horizontId.HasValue)
         {
             query = query.Where(s => s.IdHorizont == horizontId.Value);
@@ -61,7 +60,6 @@ public class stemController : ControllerBase
         });
     }
 
-    // Получение ствола по ID
     [HttpGet("{id}")]
     public async Task<ActionResult<Stem>> GetStem(long id)
     {
@@ -86,9 +84,8 @@ public class stemController : ControllerBase
             return BadRequest("Point data is null.");
         }
 
-        // Находим ствол по IdStem
         var stem = await _context.Stems
-            .Include(s => s.IdWellNavigation) // Включаем связанную скважину
+            .Include(s => s.IdWellNavigation) 
             .FirstOrDefaultAsync(s => s.IdStem == idStem);
 
         if (stem == null)
@@ -96,16 +93,15 @@ public class stemController : ControllerBase
             return BadRequest("Stem with the specified IdStem does not exist.");
         }
 
-        // Убедимся, что точка врезки связана с той же скважиной, что и ствол
         point.IdWell = stem.IdWell;
         point.IdStem = idStem; 
-        // Добавляем точку врезки в контекст
+
         _context.Points.Add(point);
         await _context.SaveChangesAsync();
 
         return Ok(new { message = "Piercing point added successfully.", pointId = point.IdPoint });
     }
-    // Добавление нового ствола
+
     [HttpPost("add")]
     public async Task<IActionResult> AddStem([FromBody] Stem stem)
     {
@@ -114,9 +110,8 @@ public class stemController : ControllerBase
             return BadRequest("Stem data is null.");
         }
 
-        // Проверяем, существует ли скважина (Well) с указанным I   dWell
         var well = await _context.Wells
-            .Include(w => w.IdTypeNavigation) // Загружаем связанный тип скважины
+            .Include(w => w.IdTypeNavigation) 
             .FirstOrDefaultAsync(w => w.IdWell == stem.IdWell);
 
         if (well == null)
@@ -124,7 +119,6 @@ public class stemController : ControllerBase
             return BadRequest("Well with the specified IdWell does not exist.");
         }
 
-        // Проверяем, существует ли пласт (Horizont) с указанным IdHorizont
         if (stem.IdHorizont != null)
         {
             var horizontExists = await _context.Horizonts.AnyAsync(h => h.IdHorizont == stem.IdHorizont);
@@ -134,7 +128,6 @@ public class stemController : ControllerBase
             }
         }
 
-        // Добавляем новый ствол в контекст
         _context.Stems.Add(stem);
         await _context.SaveChangesAsync();
   

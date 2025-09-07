@@ -15,7 +15,6 @@ public class horizontController : ControllerBase
     }
 
 
-    // Добавление нового пласта
     [HttpPost]
     public async Task<IActionResult> AddHorizont([FromBody] Horizont horizont)
     {
@@ -24,14 +23,13 @@ public class horizontController : ControllerBase
             return BadRequest("Horizont data is null.");
         }
 
-        // Проверяем, существует ли поле (Field) с указанным IdField
         var fieldExists = await _context.Fields.AnyAsync(f => f.IdField == horizont.IdField);
         if (!fieldExists)
         {
             return BadRequest("Field with the specified IdField does not exist.");
         }
 
-        // Добавляем новый пласт в контекст
+
         _context.Horizonts.Add(horizont);
         await _context.SaveChangesAsync();
 
@@ -75,7 +73,7 @@ public class horizontController : ControllerBase
 
         return Ok(horizonts);
     }
-    // Метод для получения данных горизонтов с фильтрацией
+
     [HttpGet("table")]
     public async Task<ActionResult> GetHorizonts(
   [FromQuery] int page = 1,
@@ -84,11 +82,11 @@ public class horizontController : ControllerBase
   [FromQuery] long? wellId = null)
     {
         var query = _context.Horizonts
-         .Include(h => h.IdFieldNavigation) // Поле
-         .Include(h => h.IdWellNavigation)             // Скважина (навигационное свойство)
+         .Include(h => h.IdFieldNavigation) 
+         .Include(h => h.IdWellNavigation)             
          .AsQueryable();
 
-        // Применяем фильтры, если они указаны
+ 
         if (fieldId.HasValue)
         {
             query = query.Where(h => h.IdField == fieldId.Value);
@@ -96,7 +94,7 @@ public class horizontController : ControllerBase
 
         if (wellId.HasValue)
         {
-            query = query.Where(h => h.IdWell == wellId.Value); // Фильтр по WellId
+            query = query.Where(h => h.IdWell == wellId.Value); 
         }
 
         var totalRecords = await query.CountAsync();

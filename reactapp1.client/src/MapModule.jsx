@@ -6,8 +6,10 @@ import { OSM, Vector as VectorSource, XYZ } from 'ol/source';
 import { Feature } from 'ol';
 import { Point, LineString } from 'ol/geom';
 import { Style, Icon, Text as OlText, Stroke, Fill, RegularShape, Circle } from 'ol/style';
-import { Drawer, Descriptions, Button, Modal, Table, Empty, Typography, Radio, Card, Form, Input, message} from 'antd';
+import { Drawer, Descriptions, Button, Modal, Table, Empty, Typography, Radio, Card, Form, Input, message, Tabs} from 'antd';
 import { useLocation } from 'react-router-dom';
+import Highcharts from 'highcharts';
+import HighchartsReact from 'highcharts-react-official';
 
 const { Text } = Typography;
 
@@ -25,7 +27,7 @@ const UnifiedMapModule = ({
     const [horizonData, setHorizonData] = useState([]);
     const [loadingHorizonData, setLoadingHorizonData] = useState(false);
     const [pageSize, setPageSize] = useState(10);
-    const [mapMode, setMapMode] = useState('standard'); // 'standard' или 'routes'
+    const [mapMode, setMapMode] = useState('standard');
     const location = useLocation();
     const [isPackerModalVisible, setIsPackerModalVisible] = useState(false);
     const [packerData, setPackerData] = useState([]);
@@ -35,6 +37,7 @@ const UnifiedMapModule = ({
     const [loadingSlantData, setLoadingSlantData] = useState(false);
     const [isSlantModalVisible, setIsSlantModalVisible] = useState(false);
     const [isModalVisible, setIsModalVisible] = useState(false);
+    const [chartOptions, setChartOptions] = useState(null);
     const [editingRecord, setEditingRecord] = useState(null);
     const [form] = Form.useForm();
 
@@ -46,17 +49,68 @@ const UnifiedMapModule = ({
         setIsModalVisible(true);
     };
 
+    const createChartOptions = (data) => {
+        const sortedData = [...data].sort((a, b) => a.height - b.height);
+
+        return {
+            chart: {
+                type: 'line',
+                height: 400,
+            },
+            title: {
+                text: 'Диаграмма кривизны скважины'
+            },
+            xAxis: {
+                title: {
+                    text: 'Зенит (°)'
+                },
+                min: Math.min(...sortedData.map(item => item.slant)) - 5,
+                max: Math.max(...sortedData.map(item => item.slant)) + 5
+            },
+            yAxis: {
+                title: {
+                    text: 'Глубина (м)'
+                },
+                reversed: true, 
+                min: Math.min(...sortedData.map(item => item.height)) -1,
+                max: Math.max(...sortedData.map(item => item.height)) + 50
+            },
+            series: [{
+                name: 'Кривизна',
+                data: sortedData.map(item => [item.slant, item.height]),
+                color: '#ff0000',
+                marker: {
+                    enabled: true,
+                    radius: 4,
+                    fillColor: '#ff0000',
+                    lineWidth: 2,
+                },
+                tooltip: {
+                    pointFormat: 'Глубина: {point.y} м<br>Искривление: {point.x}°'
+                }
+            }],
+            credits: {
+                enabled: false
+            },
+            legend: {
+                enabled: false
+            }
+        };
+    };
+
+
     const handleShowSlantTable = async (wellId) => {
         setLoadingSlantData(true);
         setIsSlantModalVisible(true);
         setSlantData([]);
+        setChartOptions(null);
 
         try {
             const response = await fetch(`/api/well/wellslant/table?wellId=${wellId}`);
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
             const data = await response.json();
-            console.log('Slant Data Response:', data);
+            console.log('Данные искревления:', data);
 
             let formattedData = [];
             if (Array.isArray(data)) {
@@ -71,19 +125,25 @@ const UnifiedMapModule = ({
                 item.azimuth !== undefined
             );
 
-            setSlantData(validatedData.map(item => ({
+            const slantDataWithKeys = validatedData.map(item => ({
                 ...item,
                 key: item.idWellSlant || `${wellId}-${item.height}-${Math.random().toString(36).substr(2, 9)}`
-            })));
+            }));
+
+            setSlantData(slantDataWithKeys);
+
+            if (slantDataWithKeys.length > 0) {
+                setChartOptions(createChartOptions(slantDataWithKeys));
+            }
         } catch (error) {
-            console.error('Error loading slant data:', error);
+            console.error('Не удалось загрузить:', error);
             message.error('Не удалось загрузить данные о кривизне');
             setSlantData(null);
         } finally {
             setLoadingSlantData(false);
         }
     };
-    // Функция для загрузки данных о пакерах
+
     const fetchPackerData = async (wellId) => {
         setLoadingPackerData(true);
         try {
@@ -91,12 +151,12 @@ const UnifiedMapModule = ({
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
             const data = await response.json();
-            console.log('Packer Data Response:', data);
+            console.log('Данные пакера:', data);
 
             const packersData = data.packers?.$values || data.$values || data;
 
             if (!Array.isArray(packersData)) {
-                throw new Error('Expected data to be an array');
+                throw new Error('Не удалось загрузить');
             }
 
             const formattedData = packersData.map(item => ({
@@ -109,20 +169,19 @@ const UnifiedMapModule = ({
 
             setPackerData(formattedData);
         } catch (error) {
-            console.error('Error loading packer data:', error);
+            console.error('Не удалось загрузить ', error);
             message.error('Не удалось загрузить данные о пакерах');
         } finally {
             setLoadingPackerData(false);
         }
     };
 
-    // Функция для открытия модального окна с пакерами
+
     const handleShowPackerTable = async (wellId) => {
         setIsPackerModalVisible(true);
         await fetchPackerData(wellId);
     };
 
-    // Функция для получения маршрута между двумя точками с использованием OSRM
     const getRoute = async (start, end) => {
         try {
             const response = await fetch(
@@ -137,7 +196,7 @@ const UnifiedMapModule = ({
         }
     };
 
-    // Функция для добавления маршрута на карту
+
     const addRouteToMap = (coordinates) => {
         const routeFeature = new Feature({
             geometry: new LineString(coordinates),
@@ -154,14 +213,14 @@ const UnifiedMapModule = ({
         vectorSourceRef.current.addFeature(routeFeature);
     };
 
-    // Загрузка данных для стандартного режима
+
     const loadStandardMapData = async () => {
         try {
             const response = await fetch('/api/well/map/point');
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
             const data = await response.json();
-            console.log('API Response:', data);
+            console.log('АПИ:', data);
 
             const pointsData = (() => {
                 if (Array.isArray(data)) return data;
@@ -170,7 +229,7 @@ const UnifiedMapModule = ({
             })();
 
             if (!Array.isArray(pointsData)) {
-                throw new Error('Expected array but got: ' + JSON.stringify(data));
+                throw new Error('Не удалось загрузить: ' + JSON.stringify(data));
             }
 
             const newFeatures = [];
@@ -321,14 +380,13 @@ const UnifiedMapModule = ({
         }
     };
 
-    // Загрузка данных для режима с маршрутами
     const loadRoutesMapData = async () => {
         try {
             const response = await fetch('/api/well/map/point');
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
             const data = await response.json();
-            console.log('API Response:', data);
+            console.log('АПИ:', data);
 
             const pointsData = (() => {
                 if (Array.isArray(data)) return data;
@@ -337,7 +395,7 @@ const UnifiedMapModule = ({
             })();
 
             if (!Array.isArray(pointsData)) {
-                throw new Error('Expected array but got: ' + JSON.stringify(data));
+                throw new Error('Не удалось загрузить: ' + JSON.stringify(data));
             }
 
             const newFeatures = [];
@@ -377,7 +435,6 @@ const UnifiedMapModule = ({
 
                 newFeatures.push(feature);
 
-                // Построение маршрутов между связанными точками
                 if (point.links && point.links.$values && Array.isArray(point.links.$values)) {
                     point.links.$values.forEach(async (link) => {
                         const linkedWell = pointsData.find((w) => w.idWell === link.wellLink);
@@ -397,7 +454,7 @@ const UnifiedMapModule = ({
             vectorSourceRef.current.clear();
             vectorSourceRef.current.addFeatures(newFeatures);
         } catch (error) {
-            console.error('Error loading points:', error);
+            console.error('Не удалось загрузить:', error);
         }
     };
 
@@ -410,7 +467,7 @@ const UnifiedMapModule = ({
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
             const data = await response.json();
-            console.log('Horizon Data Response:', data);
+            console.log('Данные пластов:', data);
 
             const formattedData = data.horizonts.$values.map(item => ({
                 ...item,
@@ -421,18 +478,18 @@ const UnifiedMapModule = ({
 
             setHorizonData(formattedData);
         } catch (error) {
-            console.error('Error loading horizon data:', error);
+            console.error('Не удалось загрузить:', error);
         } finally {
             setLoadingHorizonData(false);
         }
     };
 
-    // Переключение режимов карты
+
     const handleMapModeChange = (e) => {
         setMapMode(e.target.value);
     };
 
-    // Загрузка данных в зависимости от выбранного режима
+
     useEffect(() => {
         if (mapInstance.current) {
             if (mapMode === 'standard') {
@@ -450,7 +507,6 @@ const UnifiedMapModule = ({
 
             const updatedPacker = await updatePacker(editingRecord.idPacker, newDepth);
 
-            // ИСПРАВЛЕНО: используем packerData вместо data
             const updatedData = packerData.map(item =>
                 item.idPacker === editingRecord.idPacker
                     ? { ...item, depth: newDepth }
@@ -459,10 +515,9 @@ const UnifiedMapModule = ({
 
             setPackerData(updatedData);
             setIsModalVisible(false);
-            setIsPackerModalVisible(false); // Закрываем модальное окно с пакерами
+            setIsPackerModalVisible(false); 
             message.success('Изменения успешно сохранены');
 
-            // ПРИНУДИТЕЛЬНАЯ ПЕРЕЗАГРУЗКА СТРАНИЦЫ
             setTimeout(() => {
                 window.location.reload(true);
             }, 500);
@@ -492,7 +547,7 @@ const UnifiedMapModule = ({
             throw error;
         }
     };
-    // Инициализация карты
+
     useEffect(() => {
         const params = new URLSearchParams(location.search);
         const wellId = params.get('wellId');
@@ -541,7 +596,7 @@ const UnifiedMapModule = ({
                 const pointData = clickedFeatures[0].get('info');
 
                 if (!pointData || !pointData.idWell) {
-                    console.warn('Invalid pointData:', pointData);
+                    console.warn('Не удалось загрузить:', pointData);
                     return;
                 }
 
@@ -571,7 +626,6 @@ const UnifiedMapModule = ({
             mapInstance.current = map;
         }
 
-        // Загружаем данные при монтировании
         if (mapMode === 'standard') {
             loadStandardMapData();
         } else {
@@ -626,7 +680,7 @@ const UnifiedMapModule = ({
                         <Descriptions.Item label="Кривизна">
                             <Button
                                 type="link"
-                                onClick={() => onShowSlantTable(selectedPoint.idWell)}
+                                onClick={() => handleShowSlantTable(selectedPoint.idWell)}
                             >
                                 Подробнее
                             </Button>
@@ -648,14 +702,14 @@ const UnifiedMapModule = ({
                 visible={isHorizonModalVisible}
                 onCancel={() => setIsHorizonModalVisible(false)}
                 footer={null}
-                width={800}
+                width={400}
             >
                 <Table
                     columns={[
                         { title: "Название горизонта", dataIndex: "name", key: "name" },
                         { title: "Область", dataIndex: "fieldName", key: "fieldName" },
                         { title: "№ скважины", dataIndex: "wellName", key: "wellName" },
-                        { title: "Крыша", dataIndex: "roof", key: "roof" },
+                        { title: "Кровля", dataIndex: "roof", key: "roof" },
                         { title: "Подошва", dataIndex: "sole", key: "sole" },
                         {
                             title: "Эфф. мощн",
@@ -695,7 +749,7 @@ const UnifiedMapModule = ({
                 visible={isPackerModalVisible}
                 onCancel={() => setIsPackerModalVisible(false)}
                 footer={null}
-                width={800}
+                width={600}
             >
                 <Table
                     columns={[
@@ -738,36 +792,56 @@ const UnifiedMapModule = ({
                 visible={isSlantModalVisible}
                 onCancel={() => setIsSlantModalVisible(false)}
                 footer={null}
-                width={800}
+                width={600}
             >
                 {slantData && slantData.length > 0 ? (
-                    <Table
-                        columns={[
-                            { title: "Глубина (м)", dataIndex: "height", key: "height" },
-                            { title: "Искривление (°)", dataIndex: "slant", key: "slant" },
-                            { title: "Азимут (°)", dataIndex: "azimuth", key: "azimuth" },
+                    <Tabs
+                        defaultActiveKey="1"
+                        items={[
+                            {
+                                key: "1",
+                                label: "Таблица данных",
+                                children: (
+                                    <Table
+                                        columns={[
+                                            { title: "Глубина (м)", dataIndex: "height", key: "height" },
+                                            { title: "Искривление (°)", dataIndex: "slant", key: "slant" },
+                                            { title: "Азимут (°)", dataIndex: "azimuth", key: "azimuth" },
+                                        ]}
+                                        dataSource={slantData}
+                                        rowKey="key"
+                                        loading={loadingSlantData}
+                                        bordered
+                                        pagination={{
+                                            pageSize: pageSize,
+                                            showSizeChanger: true,
+                                            pageSizeOptions: ["10", "20", "50", "100"],
+                                            onShowSizeChange: (current, size) => {
+                                                setPageSize(size);
+                                            },
+                                            showTotal: (total, range) => (
+                                                <Text strong>
+                                                    {range[0]}-{range[1]} из {total} записей
+                                                </Text>
+                                            ),
+                                        }}
+                                        scroll={{ x: "max-content", y: 400 }}
+                                    />
+                                )
+                            },
+                            {
+                                key: "2",
+                                label: "Диаграмма кривизны",
+                                children: (
+                                    chartOptions && (
+                                        <HighchartsReact
+                                            highcharts={Highcharts}
+                                            options={chartOptions}
+                                        />
+                                    )
+                                )
+                            }
                         ]}
-                        dataSource={slantData}
-                        rowKey="key"
-                        loading={loadingSlantData}
-                        bordered
-                        pagination={{
-                            pageSize: pageSize,
-                            showSizeChanger: true,
-                            pageSizeOptions: ["10", "20", "50", "100"],
-                            onShowSizeChange: (current, size) => {
-                                setPageSize(size);
-                            },
-                            onChange: (page) => {
-                                setPage(page);
-                            },
-                            showTotal: (total, range) => (
-                                <Text strong>
-                                    {range[0]}-{range[1]} из {total} записей
-                                </Text>
-                            ),
-                        }}
-                        scroll={{ x: "max-content", y: 400 }}
                     />
                 ) : (
                     <Empty

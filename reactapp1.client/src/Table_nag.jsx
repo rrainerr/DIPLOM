@@ -21,7 +21,6 @@ const WellTable = () => {
     const [workshopList, setWorkshopList] = useState([]);
     const navigate = useNavigate();
 
-    // Загрузка списка НГДУ
     const fetchNgduList = async () => {
         try {
             const response = await fetch("/api/ngdu/table");
@@ -37,7 +36,6 @@ const WellTable = () => {
         }
     };
 
-    // Загрузка списка цехов для выбранного НГДУ
     const fetchWorkshopList = async (ngduId) => {
         try {
             const response = await fetch(`/api/workshop/table?ngduId=${ngduId}`);
@@ -57,7 +55,6 @@ const WellTable = () => {
         }
     };
 
-    // Загрузка всех данных
     const fetchAllData = async () => {
         setLoading(true);
         try {
@@ -88,11 +85,10 @@ const WellTable = () => {
         setLoading(false);
     };
 
-    // Применение фильтров к данным
+
     const applyFilters = (data, ngduFilter, workshopFilter, searchFilter) => {
         let filtered = [...data];
 
-        // Фильтр по НГДУ (по названию)
         if (ngduFilter) {
             const selectedNgdu = ngduList.find(item => item.idNgdu === ngduFilter);
             if (selectedNgdu) {
@@ -100,7 +96,6 @@ const WellTable = () => {
             }
         }
 
-        // Фильтр по цеху (по названию)
         if (workshopFilter) {
             const selectedWorkshop = workshopList.find(item => item.idWorkshop === workshopFilter);
             if (selectedWorkshop) {
@@ -108,7 +103,6 @@ const WellTable = () => {
             }
         }
 
-        // Фильтр по поиску
         if (searchFilter) {
             const searchLower = searchFilter.toLowerCase();
             filtered = filtered.filter(item =>
@@ -120,21 +114,18 @@ const WellTable = () => {
         setTotalRecords(filtered.length);
     };
 
-    // Обработчик поиска
     const handleSearch = (value) => {
         setSearchText(value);
         setPage(1);
         applyFilters(allData, ngdu, workshop, value);
     };
 
-    // Очистка поиска
     const handleClearSearch = () => {
         setSearchText("");
         setPage(1);
         applyFilters(allData, ngdu, workshop, "");
     };
 
-    // Загрузка всех данных при монтировании
     useEffect(() => {
         fetchNgduList();
         fetchAllData();
@@ -145,30 +136,26 @@ const WellTable = () => {
             fetchWorkshopList(ngdu);
         } else {
             setWorkshopList([]);
-            setWorkshop(""); // Сбрасываем выбор цеха при сбросе НГДУ
+            setWorkshop(""); 
         }
     }, [ngdu]);
 
-    // Применение фильтров при изменении параметров
     useEffect(() => {
         applyFilters(allData, ngdu, workshop, searchText);
     }, [ngdu, workshop, allData, ngduList, workshopList]);
 
-    // Сброс цеха при изменении НГДУ
     useEffect(() => {
         if (ngdu) {
             setWorkshop("");
         }
     }, [ngdu]);
 
-    // Получение данных для текущей страницы
     const getPagedData = () => {
         const startIndex = (page - 1) * pageSize;
         const endIndex = startIndex + pageSize;
         return filteredData.slice(startIndex, endIndex);
     };
 
-    // Колонки таблицы
     const columns = [
         {
             title: "№ Скважины",

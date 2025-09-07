@@ -14,20 +14,19 @@ public class workshopController : ControllerBase
         _context = context;
     }
 
-    // Получение списка цехов
     [HttpGet]
     public async Task<IActionResult> GetWorkshops()
     {
         var workshops = await _context.Workshops
-            .Include(w => w.IdNgduNavigation) // Включаем связанное НГДУ
-            .Include(w => w.IdTypeNavigation) // Включаем связанный тип
+            .Include(w => w.IdNgduNavigation) 
+            .Include(w => w.IdTypeNavigation)
             .Select(w => new
             {
                 w.IdWorkshop,
                 w.Name,
                 w.IdType,
-                NgduName = w.IdNgduNavigation.Name, // Название НГДУ
-                TypeName = w.IdTypeNavigation.Name // Название типа
+                NgduName = w.IdNgduNavigation.Name, 
+                TypeName = w.IdTypeNavigation.Name 
             })
             .ToListAsync();
 
@@ -47,10 +46,9 @@ public class workshopController : ControllerBase
             })
             .ToListAsync();
 
-        return Ok(workshopList); // Возвращаем массив без $id и $values
+        return Ok(workshopList); 
     }
 
-    // Добавление нового цеха
     [HttpPost("add")]
     public async Task<IActionResult> AddWorkshop([FromBody] Workshop workshop)
     {
@@ -59,10 +57,8 @@ public class workshopController : ControllerBase
             return BadRequest("Workshop data is null.");
         }
 
-        // Логируем полученные данные
         Console.WriteLine($"Received workshop data: {JsonSerializer.Serialize(workshop)}");
 
-        // Убедитесь, что навигационные свойства не передаются с клиента
         workshop.IdNgduNavigation = null;
         workshop.IdTypeNavigation = null;
         workshop.Users = null;
@@ -74,7 +70,6 @@ public class workshopController : ControllerBase
         return Ok(new { message = "Workshop added successfully.", workshopId = workshop.IdWorkshop });
     }
 
-    // Редактирование цеха
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateWorkshop(long id, [FromBody] WorkshopUpdateDto workshopDto)
     {
@@ -111,7 +106,6 @@ public class workshopController : ControllerBase
         }
     }
 
-    // Удаление цеха
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteWorkshop(long id)
     {

@@ -21,7 +21,6 @@ const HorizonTable = () => {
     const user = JSON.parse(sessionStorage.getItem('user'));
     const isRazrab = user?.roleName === 'Администратор';
 
-    // Загрузка данных для таблицы
     const fetchData = async (page, pageSize) => {
         setLoading(true);
         try {
@@ -35,12 +34,10 @@ const HorizonTable = () => {
             const result = await response.json();
             console.log("Ответ от API:", result);
 
-            // Проверяем наличие данных в правильной структуре
             if (!result || !result.packers || !result.packers.$values || !Array.isArray(result.packers.$values)) {
                 throw new Error("Некорректный формат данных от API");
             }
 
-            // Используем result.packers.$values вместо result.packers
             const formattedData = result.packers.$values.map(item => ({
                 ...item,
                 key: item.idPacker ? item.idPacker.toString() : `${Math.random()}`,
@@ -50,7 +47,7 @@ const HorizonTable = () => {
             }));
 
             setData(formattedData);
-            setFilteredData(formattedData); // Инициализируем отфильтрованные данные
+            setFilteredData(formattedData); 
             setTotalRecords(result.totalRecords);
         } catch (error) {
             console.error("Ошибка загрузки данных:", error);
@@ -59,7 +56,6 @@ const HorizonTable = () => {
         setLoading(false);
     };
 
-    // Обработчик поиска
     const handleSearch = (value) => {
         setSearchText(value);
         setPage(1); 
@@ -83,7 +79,6 @@ const HorizonTable = () => {
         fetchData(page, pageSize);
     }, [page, pageSize]);
 
-    // Обновление данных при изменении исходных данных
     useEffect(() => {
         if (searchText) {
             handleSearch(searchText);
@@ -93,7 +88,6 @@ const HorizonTable = () => {
         }
     }, [data]);
 
-    // Обновление данных пакера на сервере
     const updatePacker = async (idPacker, newDepth) => {
         try {
             const response = await fetch(`/api/paker/table/${idPacker}`, {
@@ -115,7 +109,6 @@ const HorizonTable = () => {
         }
     };
 
-    // Обработчик редактирования
     const handleEdit = (record) => {
         setEditingRecord(record);
         form.setFieldsValue({
@@ -124,7 +117,6 @@ const HorizonTable = () => {
         setIsModalVisible(true);
     };
 
-    // Сохранение изменений
     const handleSave = async () => {
         try {
             const values = await form.validateFields();
@@ -142,7 +134,6 @@ const HorizonTable = () => {
             setIsModalVisible(false);
             message.success('Изменения успешно сохранены');
 
-            // 3. Обновляем данные в таблице (перезагружаем текущую страницу)
             fetchData(page, pageSize);
         } catch (error) {
             console.error("Ошибка при сохранении:", error);
@@ -150,7 +141,6 @@ const HorizonTable = () => {
         }
     };
 
-    // Колонки таблицы
     const baseColumns = [
         {
             title: "№ скважины",

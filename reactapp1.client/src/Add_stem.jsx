@@ -5,22 +5,22 @@ const { Option } = Select;
 
 const AddStemForm = () => {
     const [form] = Form.useForm();
-    const [wells, setWells] = useState([]); // Для хранения списка скважин
-    const [horizonts, setHorizonts] = useState([]); // Для хранения списка пластов
+    const [wells, setWells] = useState([]); 
+    const [horizonts, setHorizonts] = useState([]); 
     const [loading, setLoading] = useState(false);
-    const [showPiercingDepth, setShowPiercingDepth] = useState(false); // Состояние для отображения дополнительного поля
+    const [showPiercingDepth, setShowPiercingDepth] = useState(false); 
 
-    // Загрузка списка скважин и пластов при монтировании компонента
+ 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // Загрузка скважин
+         
                 const wellsResponse = await fetch("/api/well/add");
                 if (!wellsResponse.ok) throw new Error("Не удалось загрузить список скважин");
                 const wellsData = await wellsResponse.json();
                 setWells(wellsData.$values || wellsData);
 
-                // Загрузка пластов
+             
 
             } catch (error) {
                 message.error(error.message);
@@ -40,16 +40,14 @@ const AddStemForm = () => {
         }
     };
 
-    // Обработка изменения типа ствола
+
     const handleStemTypeChange = (value) => {
-        setShowPiercingDepth(value === 1); // Показываем поле, если выбран тип "Врезаный"
+        setShowPiercingDepth(value === 1); 
     };
 
-    // Обработка отправки формы
     const onFinish = async (values) => {
         setLoading(true);
         try {
-            // Сначала добавляем ствол
             const response = await fetch("/api/stem/add", {
                 method: "POST",
                 headers: {
@@ -66,7 +64,6 @@ const AddStemForm = () => {
             console.log("Ствол добавлен:", result);
             message.success(result.message);
 
-            // Если тип ствола - врезанный, добавляем точку врезки
             if (values.IdTypeStems === 1 && values.PiercingDepth) {
                 const pointResponse = await fetch(`/api/stem/${result.stemId}/point`, {
                     method: "POST",
@@ -88,7 +85,7 @@ const AddStemForm = () => {
             }
 
             form.resetFields();
-            setShowPiercingDepth(false); // Скрываем поле после отправки
+            setShowPiercingDepth(false); 
         } catch (error) {
             console.error("Ошибка:", error);
             message.error(error.message);
@@ -108,7 +105,7 @@ const AddStemForm = () => {
                 >
                     <Select
                         placeholder="Выберите скважину"
-                        onChange={handleWellChange} // Добавляем обработчик изменения
+                        onChange={handleWellChange}
                     >
                         {wells.map((well) => (
                             <Option key={well.idWell} value={well.idWell}>

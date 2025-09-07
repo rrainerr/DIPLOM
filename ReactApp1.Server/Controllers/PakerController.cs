@@ -27,14 +27,12 @@ namespace ReactApp1.Server.Controllers
                 return BadRequest("Packer data is null.");
             }
 
-            // Проверяем, существует ли скважина (Well) с указанным IdWell
             var wellExists = await _context.Wells.AnyAsync(w => w.IdWell == packer.IdWell);
             if (!wellExists)
             {
                 return BadRequest("Well with the specified IdWell does not exist.");
             }
 
-            // Добавляем новый пакер в контекст
             _context.Packers.Add(packer);
             await _context.SaveChangesAsync();
 
@@ -51,7 +49,6 @@ namespace ReactApp1.Server.Controllers
                 .Include(p => p.IdWellNavigation) // Включаем данные о скважине
                 .AsQueryable();
 
-            // Применение фильтра по скважине
             if (wellId.HasValue)
             {
                 query = query.Where(p => p.IdWell == wellId.Value);
@@ -78,7 +75,6 @@ namespace ReactApp1.Server.Controllers
             });
         }
 
-        // Получение пакера по ID
         [HttpGet("table/{id}")]
         public async Task<ActionResult<Packer>> GetPacker(long id)
         {
@@ -115,24 +111,24 @@ namespace ReactApp1.Server.Controllers
                 return BadRequest("Well not found");
             }
 
-            // Сохраняем старую глубину для сравнения
+
             var oldDepth = packer.Depth;
             packer.Depth = updateDto.Depth;
 
             var well = packer.IdWellNavigation;
             bool hasActiveHorizonts = false;
 
-            // Обрабатываем все горизонты скважины
+
             foreach (var horizont in well.Horizonts)
             {
                 bool isHorizontActive = false;
 
-                // Проверяем все стволы горизонта
+
                 foreach (var stem in horizont.Stems)
                 {
                     bool stemShouldBeActive = false;
 
-                    // Проверяем точки ствола, если они есть
+
                     if (stem.Points.Any())
                     {
                         foreach (var point in stem.Points)
@@ -146,7 +142,7 @@ namespace ReactApp1.Server.Controllers
                     }
                     else
                     {
-                        // Если точек нет, проверяем глубину ствола
+
                         if (stem.Depth <= updateDto.Depth)
                         {
                             stemShouldBeActive = true;
@@ -155,14 +151,12 @@ namespace ReactApp1.Server.Controllers
 
                     stem.Work = stemShouldBeActive ? 1 : 0;
 
-                    // Если хотя бы один ствол горизонта активен, горизонт активен
                     if (stemShouldBeActive)
                     {
                         isHorizontActive = true;
                     }
                 }
 
-                // Обновляем состояние горизонта
                 horizont.SostPl = isHorizontActive ? 1 : 0;
 
                 if (isHorizontActive)
@@ -171,7 +165,6 @@ namespace ReactApp1.Server.Controllers
                 }
             }
 
-            // Обрабатываем все стволы скважины, не привязанные к горизонтам
             foreach (var stem in well.Stems.Where(s => s.IdHorizont == null))
             {
                 bool stemShouldBeActive = false;
@@ -198,7 +191,6 @@ namespace ReactApp1.Server.Controllers
                 stem.Work = stemShouldBeActive ? 1 : 0;
             }
 
-            // Обновляем состояние связи (Link) в зависимости от активных горизонтов
             var link = well.IdType == 1
                 ? await _context.Links.FirstOrDefaultAsync(l => l.IdWell == well.IdWell)
                 : await _context.Links.FirstOrDefaultAsync(l => l.WellLink == well.IdWell);
@@ -212,7 +204,6 @@ namespace ReactApp1.Server.Controllers
             {
                 await _context.SaveChangesAsync();
 
-                // Возвращаем обновленные данные пакера
                 var result = new
                 {
                     packer.IdPacker,
