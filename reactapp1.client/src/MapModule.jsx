@@ -6,7 +6,7 @@ import { OSM, Vector as VectorSource, XYZ } from 'ol/source';
 import { Feature } from 'ol';
 import { Point, LineString } from 'ol/geom';
 import { Style, Icon, Text as OlText, Stroke, Fill, RegularShape, Circle } from 'ol/style';
-import { Drawer, Descriptions, Button, Modal, Table, Empty, Typography, Radio, Card, Form, Input, message, Tabs} from 'antd';
+import { Drawer, Descriptions, Button, Modal, Table, Empty, Typography, Radio, Card, Form, Input, message, Tabs } from 'antd';
 import { useLocation } from 'react-router-dom';
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
@@ -71,8 +71,8 @@ const UnifiedMapModule = ({
                 title: {
                     text: 'Глубина (м)'
                 },
-                reversed: true, 
-                min: Math.min(...sortedData.map(item => item.height)) -1,
+                reversed: true,
+                min: Math.min(...sortedData.map(item => item.height)) - 1,
                 max: Math.max(...sortedData.map(item => item.height)) + 50
             },
             series: [{
@@ -515,7 +515,7 @@ const UnifiedMapModule = ({
 
             setPackerData(updatedData);
             setIsModalVisible(false);
-            setIsPackerModalVisible(false); 
+            setIsPackerModalVisible(false);
             message.success('Изменения успешно сохранены');
 
             setTimeout(() => {
@@ -702,7 +702,7 @@ const UnifiedMapModule = ({
                 visible={isHorizonModalVisible}
                 onCancel={() => setIsHorizonModalVisible(false)}
                 footer={null}
-                width={400}
+                width={600}
             >
                 <Table
                     columns={[
@@ -871,7 +871,6 @@ const UnifiedMapModule = ({
                             required: true,
                             message: 'Пожалуйста, введите глубину',
                             pattern: new RegExp(/^[0-9]+(\.[0-9]+)?$/),
-                            message: 'Пожалуйста, введите корректное число'
                         }]}
                     >
                         <Input placeholder="Введите глубину" />

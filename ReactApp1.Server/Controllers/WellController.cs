@@ -31,6 +31,16 @@ public class wellController : ControllerBase
 
         return Ok(wellsWithoutPackers);
     }
+
+    [HttpGet("name/{wellId}")]
+    public async Task<IActionResult> GetWellName(int wellId)
+    {
+           var well = await _context.Wells
+                .FirstOrDefaultAsync(p => p.IdWell == wellId);
+
+            return Ok(well);
+    }
+
     [HttpGet("list")]
     public async Task<ActionResult<IEnumerable<Well>>> GetWell()
     {

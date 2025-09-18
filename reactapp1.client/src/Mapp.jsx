@@ -1,10 +1,9 @@
-﻿import React, { useEffect, useState, useRef } from 'react';
-import { Layout, Row, Col, Modal, InputNumber, message, Typography, Button, Alert, Empty, Table, Form } from 'antd';
+﻿import { useEffect, useState } from 'react';
+import { Layout, Row, Col, Modal, InputNumber, message, Typography, Button, Alert, Table } from 'antd';
 import { useLocation } from 'react-router-dom';
 import ChartsModule from './ChartsModule';
 import MapModule from './MapModule';
 import TableModule from './TableModule';
-import { useNavigate } from 'react-router-dom';
 import './App.css';
 
 const { Content } = Layout;
@@ -23,8 +22,7 @@ const Mapp = () => {
     const [forecastedRatio, setforecastedRatio] = useState({});
     const [usedDefaults, setUsedDefaults] = useState([]);
     const [defaultsModalVisible, setDefaultsModalVisible] = useState(false);
-    const [page, setPage] = useState(1);
-    const [pageSize, setPageSize] = useState(10);
+    const [wellName, setWellName] = useState('');
 
     const location = useLocation();
     const user = JSON.parse(sessionStorage.getItem('user'));
@@ -52,7 +50,19 @@ const Mapp = () => {
             console.error('Не удалось загрузить:', error);
         }
     };
+    const fetchWellName = async (wellId) => {
+        try {
+            const response = await fetch(`/api/well/name/${wellId}`);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
+            const data = await response.json();
+            const linkedWellsData = data.$values || data;
+            console.log("Полный ответ сервера:", linkedWellsData);
+            setWellName(linkedWellsData.name);
+        } catch (error) {
+            console.error('Не удалось загрузить название скважины:', error);
+        }
+    };
 
     const fetchCrmData = async (producerId) => {
         setLoadingCrm(true);
@@ -242,6 +252,7 @@ const Mapp = () => {
         const wellId = params.get('wellId');
 
         if (wellId) {
+            fetchWellName(wellId);
             fetchLinkedWells(wellId);
             fetchCrmData(wellId);
         }
@@ -272,7 +283,30 @@ const Mapp = () => {
     return (
         <Layout style={{ background: 'white' }}>
             <Content>
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    marginBottom: 5,
+                    padding: '5px',
+                    background: '#f6ffed',
+                    border: '1px solid #b7eb8f',
+                    borderRadius: 6
+                }}>
+                    <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="#52c41a"
+                        style={{ marginRight: 12 }}
+                    >
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                    </svg>
+                    <Text strong style={{ fontSize: 16, color: '#389e0d' }}>
+                        Скважина №: {wellName}
+                    </Text>
+                </div>
                 <Row gutter={[16, 16]}>
+
                     <Col span={8}>
                         <ChartsModule
                             crmData={crmData}

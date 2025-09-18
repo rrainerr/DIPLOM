@@ -239,7 +239,6 @@ const HorizonTable = () => {
                                 required: true,
                                 message: 'Пожалуйста, введите глубину',
                                 pattern: new RegExp(/^[0-9]+(\.[0-9]+)?$/),
-                                message: 'Пожалуйста, введите корректное число'
                             }]}
                         >
                             <Input placeholder="Введите глубину" />

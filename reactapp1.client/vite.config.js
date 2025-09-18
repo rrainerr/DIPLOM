@@ -154,6 +154,12 @@ export default defineConfig({
                 secure: false,
                 changeOrigin: true
             },
+            "^/api/well/name/*": {
+                target,
+                secure: false,
+                changeOrigin: true
+            },
+
          
             "^/api/stem": {
                 target,

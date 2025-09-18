@@ -164,7 +164,7 @@ const Mapp = () => {
     const [loadingHorizonData, setLoadingHorizonData] = useState(false);
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
-
+    const [wellName, setWellName] = useState('');
     const [usedDefaults, setUsedDefaults] = useState([]);
     const [defaultsModalVisible, setDefaultsModalVisible] = useState(false);
 
@@ -426,7 +426,19 @@ const Mapp = () => {
             console.error('Error loading points:', error);
         }
     };
+    const fetchWellName = async (wellId) => {
+        try {
+            const response = await fetch(`/api/well/name/${wellId}`);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
+            const data = await response.json();
+            const linkedWellsData = data.$values || data;
+            console.log("Полный ответ сервера:", linkedWellsData);
+            setWellName(linkedWellsData.name);
+        } catch (error) {
+            console.error('Не удалось загрузить название скважины:', error);
+        }
+    };
     useEffect(() => {
         const params = new URLSearchParams(location.search);
         const wellId = params.get('wellId');
@@ -434,6 +446,7 @@ const Mapp = () => {
         if (wellId) {
             fetchLinkedWells(wellId);
             fetchCrmData(wellId);
+            fetchWellName(wellId);
         }
 
         if (!mapRef.current) return;
@@ -583,6 +596,28 @@ const Mapp = () => {
     return (
         <Layout style={{ background: 'white' }}>
             <Content>
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    marginBottom: 5,
+                    padding: '5px',
+                    background: '#f6ffed',
+                    border: '1px solid #b7eb8f',
+                    borderRadius: 6
+                }}>
+                    <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="#52c41a"
+                        style={{ marginRight: 12 }}
+                    >
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                    </svg>
+                    <Text strong style={{ fontSize: 16, color: '#389e0d' }}>
+                        Скважина №: {wellName}
+                    </Text>
+                </div>
                 <Row gutter={[16, 16]}>
                     <Col span={12}>
                         <ChartsModule
