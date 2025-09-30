@@ -207,6 +207,11 @@ export default defineConfig({
                 secure: false,
                 changeOrigin: true
             },
+            "^/api/horizont/import": {
+                target,
+                secure: false,
+                changeOrigin: true
+            },
 
             "^/api/ngdu/add": {
                 target,

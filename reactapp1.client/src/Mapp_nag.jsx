@@ -14,6 +14,7 @@ import HighchartsReact from 'highcharts-react-official';
 import { Circle } from 'ol/style';
 import { WarningOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import MapModule from './MapModule';
+import { useNavigate } from 'react-router-dom';
 
 const { Content } = Layout;
 const { Text } = Typography;
@@ -167,7 +168,7 @@ const Mapp = () => {
     const [wellName, setWellName] = useState('');
     const [usedDefaults, setUsedDefaults] = useState([]);
     const [defaultsModalVisible, setDefaultsModalVisible] = useState(false);
-
+    const navigate = useNavigate();
     const [crmData, setCrmData] = useState(null);
     const [loadingCrm, setLoadingCrm] = useState(false);
 
@@ -559,9 +560,16 @@ const Mapp = () => {
 
     const columns = [
         {
-            title: '№Скважины',
-            dataIndex: 'name',
-            key: 'name',
+
+            title: '№Скважины', dataIndex: 'name', key: "name",
+            render: (text, record) => (
+                <a
+                    onClick={() => navigate(`/Mapp?wellId=${record.idWell}`)}
+                    style={{ cursor: 'pointer', color: '#8cbea8' }}
+                >
+                    {text}
+                </a>
+            ),
         },
         { title: 'Цех', dataIndex: ['workshop', 'name'], key: 'workshop' },
         { title: 'НГДУ', dataIndex: ['workshop', 'ngdu', 'name'], key: 'ngdu' },

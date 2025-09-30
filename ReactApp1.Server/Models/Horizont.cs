@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace ReactApp1.Server.Models;
 
@@ -7,13 +8,13 @@ public partial class Horizont
 {
     public long IdHorizont { get; set; }
 
-    public long? IdField { get; set; }
+    public long IdField { get; set; }
 
     public double? Roof { get; set; }
 
     public double? Sole { get; set; }
 
-    public string? Name { get; set; }
+    public string Name { get; set; } = null!;
 
     public double? Porosity { get; set; }
 
@@ -25,7 +26,7 @@ public partial class Horizont
 
     public double? Compressibility { get; set; }
 
-    public long? IdWell { get; set; }
+    public long IdWell { get; set; }
 
     public long? SostPl { get; set; }
 

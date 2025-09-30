@@ -243,7 +243,7 @@ const ChartsModule = ({
                 yAxis: 0
             },
             {
-                name: 'Коэффициент влияния',
+                name: 'Текущий коэффициент влияния',
                 data: injectionComparisonData.map(item => item.connectivity * 100),
                 type: 'spline',
                 color: '#ff4d4f',
@@ -266,7 +266,7 @@ const ChartsModule = ({
             enabled: false
         }
     };
-
+        
     return (
         <>
             <Card>

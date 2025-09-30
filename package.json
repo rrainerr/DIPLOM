@@ -5,6 +5,7 @@
     "@types/ol": "^6.5.3",
     "antd": "^5.24.1",
     "crypto-js": "^4.2.0",
+    "file-saver": "^2.0.5",
     "highcharts": "^12.3.0",
     "highcharts-react-official": "^3.2.2",
     "ol": "^10.4.0",
@@ -13,6 +14,10 @@
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.1.5",
     "recharts": "^2.15.1",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
   }
 }

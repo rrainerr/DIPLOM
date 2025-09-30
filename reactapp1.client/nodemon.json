@@ -1,0 +1,7 @@
+{
+  "watch": [ "vite.config.js", "package.json", "src/**/*" ],
+  "ext": "js,jsx,ts,tsx,json,css,html",
+  "ignore": [ "node_modules", "dist" ],
+  "delay": 1000,
+  "exec": "vite"
+}

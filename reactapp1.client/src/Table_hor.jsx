@@ -68,7 +68,7 @@ const HorizonTable = () => {
             dataIndex: "wellName",
             key: "wellName",
         },
-        { title: "Крыша", dataIndex: "roof", key: "roof" },
+        { title: "Кровля", dataIndex: "roof", key: "roof" },
         { title: "Подошва", dataIndex: "sole", key: "sole" },
         {
             title: "Эфф. мощн",

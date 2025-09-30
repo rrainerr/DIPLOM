@@ -13,8 +13,8 @@ const { Sider } = Layout;
 
 const SidebarComponent = ({ collapsed, setCollapsed }) => {
     const [showSecondSider, setShowSecondSider] = useState(false);
-    const location = useLocation(); 
-    const [selectedKeys, setSelectedKeys] = useState(['1']); 
+    const location = useLocation();
+    const [selectedKeys, setSelectedKeys] = useState(['1']);
 
 
     useEffect(() => {
@@ -38,23 +38,23 @@ const SidebarComponent = ({ collapsed, setCollapsed }) => {
 
         if (path === '/profile') {
             setSelectedKeys(['1']);
-        }  else if (path === '/Maping') {
+        } else if (path === '/Maping') {
             setSelectedKeys(['3']);
-        } 
+        }
         else if (path === '/Table') {
             setSelectedKeys(['2-2']);
         }
         else if (path === '/Table_hor') {
-            setSelectedKeys(['2-3']); 
+            setSelectedKeys(['2-3']);
         }
         else if (path === '/Table_stem') {
             setSelectedKeys(['2-4']);
         }
         else if (path === '/Table_paker') {
-            setSelectedKeys(['2-5']); 
+            setSelectedKeys(['2-5']);
         }
         else if (path === '/Table_nag') {
-            setSelectedKeys(['2-6']); 
+            setSelectedKeys(['2-6']);
         }
 
         if (path === '/Table' || path === '/Mapp' || path === '/Mapp_nag' || path === '/Table_nag' || path === '/Table_hor' || path === '/Table_stem' || path === '/Table_paker') {
@@ -62,13 +62,13 @@ const SidebarComponent = ({ collapsed, setCollapsed }) => {
             setCollapsed(true);
         } else {
             setCollapsed(false);
-          
+
         }
     }, [location.pathname, setCollapsed]);
 
     const handleCalculationsClick = () => {
         setShowSecondSider(true);
-        setCollapsed(true); 
+        setCollapsed(true);
     };
 
     return (
@@ -77,19 +77,19 @@ const SidebarComponent = ({ collapsed, setCollapsed }) => {
                 {collapsed ? (
                     <Link onClick={() => {
                         setShowSecondSider(false);
-                        setCollapsed(false); 
+                        setCollapsed(false);
                     }} to="/"><img src="/logo2.png" className="demo-logo-vertical" alt="logo" /></Link>
                 ) : (
                     <Link onClick={() => {
                         setShowSecondSider(false);
-                        setCollapsed(false); 
+                        setCollapsed(false);
                     }} to="/"><img src="/logo.png" className="demo-logo-vertical" alt="logo" /></Link>
                 )}
                 <Menu theme="light" selectedKeys={selectedKeys} mode="inline">
                     <Menu.Item key="1" icon={<UserOutlined />}>
                         <Link onClick={() => {
                             setShowSecondSider(false);
-                            setCollapsed(false); 
+                            setCollapsed(false);
                         }} to="/profile">Профиль</Link>
                     </Menu.Item>
 
@@ -97,7 +97,7 @@ const SidebarComponent = ({ collapsed, setCollapsed }) => {
                         <Link to="/Table">Фонд скважин</Link>
                     </Menu.Item>
 
-                 
+
                 </Menu>
             </Sider>
 
@@ -113,7 +113,7 @@ const SidebarComponent = ({ collapsed, setCollapsed }) => {
                             style={{ color: '#1677ff', cursor: 'pointer' }}
                             onClick={() => {
                                 setShowSecondSider(false);
-                                setCollapsed(false); 
+                                setCollapsed(false);
                             }}
                         />
                     </div>

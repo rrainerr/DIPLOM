@@ -16,6 +16,7 @@ import Add_packer from './Add_packer';
 import Add_stem from './Add_stem';
 import Add_slant from './Add_slant';
 import Maping from './Maping';
+import Add_hor_ex from './Add_hor_ex';
 import './App.css';
 import SidebarComponent from './SidebarComponent';
 import ruRU from "antd/lib/locale/ru_RU";
@@ -57,6 +58,7 @@ function App() {
                         <Route path="/Table_paker" element={<Table_paker />} />
                         <Route path="/Table_nag" element={<Table_nag />} />
                         <Route path="/Mapp_nag" element={<Mapp_nag />} />
+                        <Route path="/Add_hor_ex" element={<Add_hor_ex />} />
                     </Routes>
                 </Content>
             </Layout>

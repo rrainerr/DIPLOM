@@ -40,7 +40,19 @@ const UnifiedMapModule = ({
     const [chartOptions, setChartOptions] = useState(null);
     const [editingRecord, setEditingRecord] = useState(null);
     const [form] = Form.useForm();
-
+    const [horizonsForChart, setHorizonsForChart] = useState([]);
+    const horizonColors = [
+        'rgba(255, 99, 132, 0.3)',  // розовый
+        'rgba(54, 162, 235, 0.3)',  // голубой
+        'rgba(255, 206, 86, 0.3)',  // желтый
+        'rgba(75, 192, 192, 0.3)',  // бирюзовый
+        'rgba(153, 102, 255, 0.3)', // фиолетовый
+        'rgba(255, 159, 64, 0.3)',  // оранжевый
+        'rgba(199, 199, 199, 0.3)', // серый
+        'rgba(83, 102, 255, 0.3)',  // синий
+        'rgba(40, 159, 64, 0.3)',   // зеленый
+        'rgba(210, 105, 30, 0.3)'   // коричневый
+    ];
     const handleEdit = (record) => {
         setEditingRecord(record);
         form.setFieldsValue({
@@ -48,69 +60,293 @@ const UnifiedMapModule = ({
         });
         setIsModalVisible(true);
     };
+    const fetchHorizonsForChart = async (wellId) => {
+        try {
+            const response = await fetch(`/api/horizont/table?wellId=${wellId}`);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
-    const createChartOptions = (data) => {
+            const data = await response.json();
+            const formattedData = data.horizonts?.$values || data || [];
+
+            const validHorizons = formattedData.filter(horizon =>
+                horizon.roof !== null && horizon.roof !== undefined &&
+                horizon.sole !== null && horizon.sole !== undefined
+            );
+
+            setHorizonsForChart(validHorizons);
+            return validHorizons;
+        } catch (error) {
+            console.error('Ошибка загрузки пластов для графика:', error);
+            return [];
+        }
+    };
+
+    const createSimpleChartOptions = (data, horizons = []) => {
         const sortedData = [...data].sort((a, b) => a.height - b.height);
+
+        // Цвета для пластов
+        const horizonColors = [
+            'rgba(255, 99, 132, 0.3)',  // розовый
+            'rgba(54, 162, 235, 0.3)',  // голубой
+            'rgba(255, 206, 86, 0.3)',  // желтый
+            'rgba(75, 192, 192, 0.3)',  // бирюзовый
+            'rgba(153, 102, 255, 0.3)', // фиолетовый
+            'rgba(255, 159, 64, 0.3)',  // оранжевый
+            'rgba(199, 199, 199, 0.3)', // серый
+            'rgba(83, 102, 255, 0.3)',  // синий
+            'rgba(40, 159, 64, 0.3)',   // зеленый
+            'rgba(210, 105, 30, 0.3)'   // коричневый
+        ];
+
+        const horizonSeries = horizons.map((horizon, index) => {
+            const roof = parseFloat(horizon.roof);
+            const sole = parseFloat(horizon.sole);
+            const colorIndex = index % horizonColors.length;
+
+            return [
+                {
+                    name: `Кровля: ${horizon.name}`,
+                    type: 'line',
+                    data: [
+                        [Math.min(...sortedData.map(item => item.slant)) - 5, roof],
+                        [Math.max(...sortedData.map(item => item.slant)) + 5, roof]
+                    ],
+                    color: '#e74c3c', // ярко-красный
+                    dashStyle: 'dash',
+                    lineWidth: 3,
+                    marker: { enabled: false },
+                    showInLegend: false,
+                    enableMouseTracking: true,
+                    zIndex: 2,
+                    tooltip: {
+                        headerFormat: '',
+                        pointFormat: `<b>${horizon.name || 'Пласт'}</b><br>Кровля: <b>{point.y} м</b>`
+                    }
+                },
+                {
+                    name: `Подошва: ${horizon.name}`,
+                    type: 'line',
+                    data: [
+                        [Math.min(...sortedData.map(item => item.slant)) - 5, sole],
+                        [Math.max(...sortedData.map(item => item.slant)) + 5, sole]
+                    ],
+                    color: '#3498db',
+                    dashStyle: 'dash',
+                    lineWidth: 3,
+                    marker: { enabled: false },
+                    showInLegend: false,
+                    enableMouseTracking: true,
+                    zIndex: 2,
+                    tooltip: {
+                        headerFormat: '',
+                        pointFormat: `<b>${horizon.name || 'Пласт'}</b><br>Подошва: <b>{point.y} м</b>`
+                    }
+                }
+            ];
+        }).flat();
 
         return {
             chart: {
                 type: 'line',
-                height: 400,
+                height: 550,
+                backgroundColor: '#f8f9fa',
+                borderRadius: 10,
+                style: {
+                    fontFamily: 'Arial, sans-serif'
+                },
+                events: {
+                    load: function () {
+                        const chart = this;
+                        horizons.forEach((horizon, index) => {
+                            const roof = parseFloat(horizon.roof);
+                            const sole = parseFloat(horizon.sole);
+                            const colorIndex = index % horizonColors.length;
+
+                            const renderer = chart.renderer;
+                            const xAxis = chart.xAxis[0];
+                            const yAxis = chart.yAxis[0];
+
+                            const x1 = xAxis.toPixels(xAxis.min);
+                            const x2 = xAxis.toPixels(xAxis.max);
+                            const y1 = yAxis.toPixels(roof);
+                            const y2 = yAxis.toPixels(sole);
+
+
+                            renderer.rect(x1, y1, x2 - x1, y2 - y1)
+                                .attr({
+                                    fill: horizonColors[colorIndex],
+                                    stroke: 'rgba(0, 0, 0, 0.2)',
+                                    'stroke-width': 1,
+                                    zIndex: 1,
+                                    opacity: 0.7
+                                })
+                                .add();
+
+                            const midY = yAxis.toPixels((roof + sole) / 2);
+                            renderer.text(horizon.name || `Пласт ${index + 1}`, x1 + 10, midY)
+                                .css({
+                                    color: '#2c3e50',
+                                    fontSize: '11px',
+                                    fontWeight: 'bold'
+                                })
+                                .attr({
+                                    zIndex: 3
+                                })
+                                .add();
+                        });
+                    }
+                }
             },
             title: {
-                text: 'Диаграмма кривизны скважины'
+                text: 'Диаграмма кривизны скважины',
+                style: {
+                    fontSize: '18px',
+                    fontWeight: 'bold',
+                    color: '#2c3e50'
+                }
             },
             xAxis: {
                 title: {
-                    text: 'Зенит (°)'
+                    text: 'Зенитный угол (°)',
+                    style: {
+                        fontSize: '14px',
+                        fontWeight: 'bold',
+                        color: '#34495e'
+                    }
                 },
                 min: Math.min(...sortedData.map(item => item.slant)) - 5,
-                max: Math.max(...sortedData.map(item => item.slant)) + 5
+                max: Math.max(...sortedData.map(item => item.slant)) + 5,
+                gridLineWidth: 1,
+                gridLineColor: 'rgba(0, 0, 0, 0.1)',
+                lineWidth: 2,
+                tickWidth: 1
             },
             yAxis: {
                 title: {
-                    text: 'Глубина (м)'
+                    text: 'Глубина (м)',
+                    style: {
+                        fontSize: '14px',
+                        fontWeight: 'bold',
+                        color: '#34495e'
+                    }
                 },
                 reversed: true,
                 min: Math.min(...sortedData.map(item => item.height)) - 1,
-                max: Math.max(...sortedData.map(item => item.height)) + 50
+                max: Math.max(...sortedData.map(item => item.height)) + 50,
+                gridLineWidth: 1,
+                gridLineColor: 'rgba(0, 0, 0, 0.1)',
+                lineWidth: 2,
+                tickWidth: 1
             },
-            series: [{
-                name: 'Кривизна',
-                data: sortedData.map(item => [item.slant, item.height]),
-                color: '#ff0000',
-                marker: {
-                    enabled: true,
-                    radius: 4,
-                    fillColor: '#ff0000',
-                    lineWidth: 2,
+            plotOptions: {
+                line: {
+                    lineWidth: 3,
+                    states: {
+                        hover: {
+                            lineWidth: 4
+                        }
+                    }
                 },
-                tooltip: {
-                    pointFormat: 'Глубина: {point.y} м<br>Искривление: {point.x}°'
+                scatter: {
+                    marker: {
+                        radius: 6,
+                        states: {
+                            hover: {
+                                radius: 8
+                            }
+                        }
+                    }
                 }
-            }],
+            },
+            series: [
+                ...horizonSeries,
+                {
+                    name: 'Кривизна скважины',
+                    data: sortedData.map(item => [item.slant, item.height]),
+                    color: '#e74c3c',
+                    lineWidth: 4,
+                    marker: {
+                        enabled: true,
+                        radius: 5,
+                        fillColor: '#ffffff',
+                        lineWidth: 3,
+                        lineColor: '#e74c3c',
+                        symbol: 'circle',
+                        states: {
+                            hover: {
+                                radius: 7,
+                                fillColor: '#e74c3c'
+                            }
+                        }
+                    },
+                    tooltip: {
+                        headerFormat: '<b>Точка измерения</b><br>',
+                        pointFormat: 'Глубина: <b>{point.y} м</b><br>Зенитный угол: <b>{point.x}°</b>'
+                    },
+                    zIndex: 5,
+                    shadow: {
+                        color: 'rgba(0, 0, 0, 0.2)',
+                        width: 5,
+                        offsetX: 0,
+                        offsetY: 0
+                    }
+                }
+            ],
             credits: {
                 enabled: false
             },
             legend: {
                 enabled: false
+            },
+            tooltip: {
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                borderWidth: 1,
+                borderColor: '#bdc3c7',
+                borderRadius: 8,
+                shadow: true,
+                style: {
+                    fontSize: '13px',
+                    padding: '10px'
+                },
+                useHTML: true
+            },
+            responsive: {
+                rules: [{
+                    condition: {
+                        maxWidth: 500
+                    },
+                    chartOptions: {
+                        chart: {
+                            height: 400
+                        },
+                        title: {
+                            style: {
+                                fontSize: '16px'
+                            }
+                        }
+                    }
+                }]
             }
         };
     };
-
 
     const handleShowSlantTable = async (wellId) => {
         setLoadingSlantData(true);
         setIsSlantModalVisible(true);
         setSlantData([]);
         setChartOptions(null);
+        setHorizonsForChart([]);
 
         try {
-            const response = await fetch(`/api/well/wellslant/table?wellId=${wellId}`);
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const [slantResponse, horizons] = await Promise.all([
+                fetch(`/api/well/wellslant/table?wellId=${wellId}`),
+                fetchHorizonsForChart(wellId)
+            ]);
 
-            const data = await response.json();
-            console.log('Данные искревления:', data);
+            if (!slantResponse.ok) throw new Error(`HTTP error! status: ${slantResponse.status}`);
+
+            const data = await slantResponse.json();
+            console.log('Данные искривления:', data);
 
             let formattedData = [];
             if (Array.isArray(data)) {
@@ -133,7 +369,7 @@ const UnifiedMapModule = ({
             setSlantData(slantDataWithKeys);
 
             if (slantDataWithKeys.length > 0) {
-                setChartOptions(createChartOptions(slantDataWithKeys));
+                setChartOptions(createSimpleChartOptions(slantDataWithKeys, horizons));
             }
         } catch (error) {
             console.error('Не удалось загрузить:', error);
@@ -400,7 +636,6 @@ const UnifiedMapModule = ({
 
             const newFeatures = [];
 
-            // Добавление точек на карту
             pointsData.forEach((point) => {
                 const coords = fromLonLat([point.longitude, point.latitude]);
                 const feature = new Feature({
@@ -833,11 +1068,61 @@ const UnifiedMapModule = ({
                                 key: "2",
                                 label: "Диаграмма кривизны",
                                 children: (
-                                    chartOptions && (
-                                        <HighchartsReact
-                                            highcharts={Highcharts}
-                                            options={chartOptions}
-                                        />
+                                    chartOptions ? (
+                                        <div>
+                                            <HighchartsReact
+                                                highcharts={Highcharts}
+                                                options={chartOptions}
+                                            />
+                                            {horizonsForChart.length > 0 && (
+                                                <div style={{
+                                                    marginTop: 10,
+                                                    padding: 5,
+                                                    backgroundColor: '#f8f9fa',
+                                                    borderRadius: 8,
+                                                    border: '1px solid #e9ecef'
+                                                }}>
+                                                    <Text strong style={{ fontSize: '16px', color: '#2c3e50', marginBottom: 10, display: 'block' }}>
+                                                        📋 Список пластов:
+                                                    </Text>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '10px' }}>
+                                                        {horizonsForChart.map((horizon, index) => {
+                                                            const colorIndex = index % horizonColors.length;
+                                                            return (
+                                                                <div key={index} style={{
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    padding: '8px 12px',
+                                                                    backgroundColor: 'white',
+                                                                    borderRadius: 6,
+                                                                    border: '1px solid #dee2e6'
+                                                                }}>
+                                                                    <span style={{
+                                                                        display: 'inline-block',
+                                                                        width: 20,
+                                                                        height: 12,
+                                                                        backgroundColor: horizonColors[colorIndex],
+                                                                        border: '2px solid rgba(0, 0, 0, 0.2)',
+                                                                        marginRight: 12,
+                                                                        borderRadius: 3
+                                                                    }}></span>
+                                                                    <div style={{ flex: 1 }}>
+                                                                        <Text strong style={{ fontSize: '14px', color: '#2c3e50' }}>
+                                                                            {horizon.name || `Пласт ${index + 1}`}
+                                                                        </Text>
+                                                                        <div style={{ fontSize: '12px', color: '#6c757d' }}>
+                                                                            Кровля: {horizon.roof} м | Подошва: {horizon.sole} м
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <Empty description="Нет данных для построения графика" />
                                     )
                                 )
                             }

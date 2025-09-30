@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect } from "react";
 import { Form, Input, Select, Button, message, Typography } from "antd";
 import { useNavigate } from "react-router-dom";
-
+import { UploadOutlined } from "@ant-design/icons";
 const { Option } = Select;
 const { Title } = Typography;
 
@@ -88,6 +88,13 @@ const AddHorizontForm = () => {
     return (
         <div style={{ padding: "24px" }}>
             <Title level={2}>Добавить новый пласт</Title>
+            <Button
+                type="primary"
+                onClick={() => navigate('/Add_hor_ex')}
+                icon={<UploadOutlined />}
+            >
+                Импорт из Excel
+            </Button>
             <Form
                 form={form}
                 layout="vertical"

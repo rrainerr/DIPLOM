@@ -1,10 +1,12 @@
 ﻿import { useEffect, useState } from 'react';
-import { Layout, Row, Col, Modal, InputNumber, message, Typography, Button, Alert, Table } from 'antd';
+import { Layout, Row, Col, Modal, InputNumber, message, Typography, Button, Alert, Table, Dropdown, Menu } from 'antd';
 import { useLocation } from 'react-router-dom';
 import ChartsModule from './ChartsModule';
 import MapModule from './MapModule';
 import TableModule from './TableModule';
 import './App.css';
+import { DownloadOutlined } from '@ant-design/icons';
+import { exportToExcel } from './excelExportService';
 
 const { Content } = Layout;
 const { Text } = Typography;
@@ -23,10 +25,251 @@ const Mapp = () => {
     const [usedDefaults, setUsedDefaults] = useState([]);
     const [defaultsModalVisible, setDefaultsModalVisible] = useState(false);
     const [wellName, setWellName] = useState('');
+    const [exportLoading, setExportLoading] = useState(false);
 
     const location = useLocation();
     const user = JSON.parse(sessionStorage.getItem('user'));
     const isGeologist = user?.roleName === 'Геолог';
+
+    // Исправленная функция с проверками
+    const getWellsDataForExport = () => {
+        const safeLinkedWells = Array.isArray(linkedWells) ? linkedWells : [];
+
+        return safeLinkedWells.map(well => ({
+            '№ Скважины': well.name || '',
+            'Цех': well.workshop?.name || '',
+            'НГДУ': well.workshop?.ngdu?.name || '',
+            'Коэффициент влияния (КВ)': well.lastratio || 0,
+            'Текущая приемистость': crmData?.currentInjectionRates?.[well.idWell] || 0,
+            'Расчетная приемистость': crmData?.injectionRates?.[well.idWell] || 0,
+            'Коэффициент влияния (%)': ((crmData?.connectivityFactors?.[well.idWell] || 0) * 100).toFixed(2),
+            'Разница приемистости': crmData?.injectionDifferences?.[well.idWell] || 0,
+            'ID скважины': well.idWell || '',
+            'ID связи': well.idLink || ''
+        }));
+    };
+
+    const getProductionDataForExport = () => {
+        if (!crmData) return {};
+
+        const productionData = {
+            'Основные_показатели': [
+                {
+                    'Текущая добыча (м³/сут)': crmData.productionRate || 0,
+                    'Общий объем добычи': crmData.totalProduction || 0,
+                    'Суммарный коэффициент влияния': crmData.totalConnectivity || 0,
+                    'Дата расчета': new Date().toLocaleDateString()
+                }
+            ],
+            'История_добычи': (crmData?.historicalProduction?.$values && Array.isArray(crmData.historicalProduction.$values))
+                ? crmData.historicalProduction.$values.map(item => ({
+                    'Дата': item.date ? new Date(item.date).toLocaleDateString() : '',
+                    'Дебит (м³/сут)': item.value || 0,
+                    'Тип': 'Исторические данные'
+                }))
+                : [],
+            'Прогноз_добычи': (crmData?.forecastedProduction?.$values && Array.isArray(crmData.forecastedProduction.$values))
+                ? crmData.forecastedProduction.$values.map(item => ({
+                    'Дата': item.date ? new Date(item.date).toLocaleDateString() : '',
+                    'Дебит (м³/сут)': item.value || 0,
+                    'Тип': 'Прогнозные данные'
+                }))
+                : []
+        };
+
+        return productionData;
+    };
+
+    const getInjectionDataForExport = () => {
+        if (!crmData || !Array.isArray(linkedWells) || linkedWells.length === 0) return {};
+
+        const injectionData = linkedWells
+            .filter(well => well && well.idWell)
+            .map(well => {
+                const wellId = well.idWell.toString();
+                return {
+                    '№ Скважины': well.name || '',
+                    'Текущая приемистость (м³/сут)': crmData.currentInjectionRates?.[wellId] || 0,
+                    'Расчетная приемистость (м³/сут)': crmData.injectionRates?.[wellId] || 0,
+                    'Разница приемистости (м³/сут)': crmData.injectionDifferences?.[wellId] || 0,
+                    'Коэффициент влияния (%)': ((crmData.connectivityFactors?.[wellId] || 0) * 100).toFixed(2),
+                    'Статус': crmData.injectionDifferences?.[wellId] > 0 ? 'Недостаточная закачка' : 'Норма'
+                };
+            });
+
+        const summaryData = [{
+            'Общая текущая приемистость': Object.values(crmData.currentInjectionRates || {}).reduce((sum, val) => sum + (val || 0), 0),
+            'Общая расчетная приемистость': Object.values(crmData.injectionRates || {}).reduce((sum, val) => sum + (val || 0), 0),
+            'Общая разница': Object.values(crmData.injectionDifferences || {}).reduce((sum, val) => sum + (val || 0), 0),
+            'Количество нагнетательных скважин': linkedWells.length
+        }];
+
+        return {
+            'Приемистость_по_скважинам': injectionData,
+            'Сводка_по_приемистости': summaryData
+        };
+    };
+
+    const getDefaultsDataForExport = () => {
+        const safeUsedDefaults = Array.isArray(usedDefaults) ? usedDefaults : [];
+
+        const defaultsByWell = safeUsedDefaults.reduce((acc, item) => {
+            const wellName = item.wellName || 'Неизвестно';
+            if (!acc[wellName]) {
+                acc[wellName] = [];
+            }
+            acc[wellName].push({
+                'Параметр': item.parameter || '',
+                'Значение': item.value || '',
+                'Источник': item.source || '',
+                'Примечание': 'Использовано усредненное значение'
+            });
+            return acc;
+        }, {});
+
+        const exportData = {};
+        Object.keys(defaultsByWell).forEach(wellName => {
+            const sheetName = wellName.length > 25 ? wellName.substring(0, 25) : wellName;
+            exportData[`Усредненные_${sheetName}`] = defaultsByWell[wellName];
+        });
+
+        // Добавляем общий лист со всеми значениями
+        if (safeUsedDefaults.length > 0) {
+            exportData['Все_усредненные_значения'] = safeUsedDefaults.map(item => ({
+                'Скважина': item.wellName || '',
+                'Параметр': item.parameter || '',
+                'Значение': item.value || '',
+                'Источник': item.source || '',
+                'ID скважины': item.wellId || ''
+            }));
+        }
+
+        return exportData;
+    };
+
+    const getAllDataForExport = () => {
+        const wellsData = getWellsDataForExport();
+        const productionData = getProductionDataForExport();
+        const injectionData = getInjectionDataForExport();
+        const defaultsData = getDefaultsDataForExport();
+
+        return {
+            'Нагнетательные_скважины': wellsData,
+            ...productionData,
+            ...injectionData,
+            ...defaultsData,
+            'Общая_информация': [
+                {
+                    'Скважина': wellName || 'Неизвестно',
+                    'ID скважины': wellId || '',
+                    'Дата экспорта': new Date().toLocaleString(),
+                    'Пользователь': user?.name || 'Неизвестно',
+                    'Роль': user?.roleName || 'Неизвестно',
+                    'Количество связанных скважин': linkedWells.length,
+                    'Статус данных CRM': crmData ? 'Загружены' : 'Отсутствуют'
+                }
+            ]
+        };
+    };
+
+    // Обработчик выборочного экспорта
+    const handleSelectiveExport = (key) => {
+        setExportLoading(true);
+        try {
+            let selectedData = {};
+            const fileName = `Данные_${key}_${wellName || 'неизвестно'}`;
+
+            switch (key) {
+                case 'wells':
+                    selectedData = {
+                        'Нагнетательные_скважины': getWellsDataForExport(),
+                        'Информация_о_экспорте': [{
+                            'Тип экспорта': 'Нагнетательные скважины',
+                            'Скважина': wellName || 'Неизвестно',
+                            'Дата экспорта': new Date().toLocaleString(),
+                            'Количество скважин': linkedWells.length
+                        }]
+                    };
+                    break;
+                case 'production':
+                    selectedData = getProductionDataForExport();
+                    // Добавляем информацию об экспорте
+                    selectedData['Информация_о_экспорте'] = [{
+                        'Тип экспорта': 'Данные по добыче',
+                        'Скважина': wellName || 'Неизвестно',
+                        'Дата экспорта': new Date().toLocaleString(),
+                        'Статус данных': crmData ? 'Данные доступны' : 'Данные отсутствуют'
+                    }];
+                    break;
+                case 'injection':
+                    selectedData = getInjectionDataForExport();
+                    // Добавляем информацию об экспорте
+                    selectedData['Информация_о_экспорте'] = [{
+                        'Тип экспорта': 'Данные по приемистости',
+                        'Скважина': wellName || 'Неизвестно',
+                        'Дата экспорта': new Date().toLocaleString(),
+                        'Количество скважин': linkedWells.length
+                    }];
+                    break;
+                case 'defaults':
+                    selectedData = getDefaultsDataForExport();
+                    // Добавляем информацию об экспорте
+                    selectedData['Информация_о_экспорте'] = [{
+                        'Тип экспорта': 'Усредненные значения',
+                        'Скважина': wellName || 'Неизвестно',
+                        'Дата экспорта': new Date().toLocaleString(),
+                        'Количество записей': usedDefaults.length
+                    }];
+                    break;
+                default:
+                    selectedData = getAllDataForExport();
+            }
+
+            console.log(`Экспорт данных для ${key}:`, selectedData);
+            exportToExcel(selectedData, fileName);
+            message.success(`Данные "${getExportTypeName(key)}" успешно экспортированы в Excel`);
+        } catch (error) {
+            console.error('Ошибка при экспорте:', error);
+            message.error('Ошибка при экспорте данных');
+        } finally {
+            setExportLoading(false);
+        }
+    };
+
+    // Функция для получения читаемого названия типа экспорта
+    const getExportTypeName = (key) => {
+        const names = {
+            'wells': 'Нагнетательные скважины',
+            'production': 'Данные по добыче',
+            'injection': 'Данные по приемистости',
+            'defaults': 'Усредненные значения',
+            'all': 'Все данные'
+        };
+        return names[key] || key;
+    };
+
+    // Меню для выборочного экспорта
+    const exportMenu = (
+        <Menu onClick={({ key }) => handleSelectiveExport(key)}>
+            <Menu.Item key="wells" icon={<DownloadOutlined />}>
+                Нагнетательные скважины
+            </Menu.Item>
+            <Menu.Item key="production" icon={<DownloadOutlined />}>
+                Данные по добыче
+            </Menu.Item>
+            <Menu.Item key="injection" icon={<DownloadOutlined />}>
+                Данные по приемистости
+            </Menu.Item>
+            <Menu.Item key="defaults" icon={<DownloadOutlined />}>
+                Усредненные значения
+            </Menu.Item>
+            <Menu.Divider />
+            <Menu.Item key="all" icon={<DownloadOutlined />}>
+                Все данные (полный отчет)
+            </Menu.Item>
+        </Menu>
+    );
+
 
     const fetchLinkedWells = async (wellId) => {
         try {
@@ -304,6 +547,16 @@ const Mapp = () => {
                     <Text strong style={{ fontSize: 16, color: '#389e0d' }}>
                         Скважина №: {wellName}
                     </Text>
+                    <Dropdown overlay={exportMenu} placement="bottomRight">
+                        <Button
+                            type=""
+                            icon={<DownloadOutlined />}
+                            loading={exportLoading}
+                            style={{ marginLeft: '12px' }}
+                        >
+                            Экспорт в Excel
+                        </Button>
+                    </Dropdown>
                 </div>
                 <Row gutter={[16, 16]}>
 

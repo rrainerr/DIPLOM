@@ -1,6 +1,7 @@
 ﻿import React, { useState } from 'react';
 import { Table, Button, Modal, InputNumber, Alert, Tooltip, Typography, Card } from 'antd';
 import { WarningOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 
 const { Text } = Typography;
 
@@ -11,8 +12,18 @@ const TableModule = ({
     isGeologist,
     onOpenRatioModal
 }) => {
+    const navigate = useNavigate();
     const columns = [
-        { title: '№Скважины', dataIndex: 'name', key: 'name' },
+        {
+            title: '№Скважины', dataIndex: 'name', key: "name",
+            render: (text, record) => (
+                <a
+                    onClick={() => navigate(`/Mapp_nag?wellId=${record.idWell}`)}
+                    style={{ cursor: 'pointer', color: '#8cbea8' }}
+                >
+                    {text}
+                </a>
+            ), },
         { title: 'Цех', dataIndex: ['workshop', 'name'], key: 'workshop' },
         { title: 'НГДУ', dataIndex: ['workshop', 'ngdu', 'name'], key: 'ngdu' },
         {
